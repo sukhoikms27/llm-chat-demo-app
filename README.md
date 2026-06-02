@@ -1,0 +1,62 @@
+# My Application — LLM Chat
+
+Android-приложение для взаимодействия с LLM-моделями через API.
+
+## Функциональность
+
+- Получение списка доступных моделей
+- Отправка сообщений в чат
+- Выбор модели из списка
+- История сообщений в рамках сессии
+
+## Требования
+
+- Android Studio
+- Min SDK 29
+- Target SDK 36
+- Kotlin 2.2.10
+
+## Сборка и запуск
+
+### 1. Клонирование
+
+```bash
+git clone <url-репозитория>
+cd AI
+```
+
+### 2. Настройка `local.properties`
+
+В корне проекта создайте или отредактируйте файл `local.properties` и добавьте параметры подключения к API:
+
+```properties
+base_url=https://your-api-url.com/
+api_key=your-api-key
+```
+
+| Параметр    | Описание                        | Обязательный |
+|-------------|---------------------------------|--------------|
+| `base_url`  | Базовый URL API-сервера         | Да           |
+| `api_key`   | Ключ авторизации (Bearer token) | Да           |
+
+
+### 3. Сборка
+
+```bash
+./gradlew assembleDebug
+```
+
+### 4. Установка на устройство
+
+```bash
+./gradlew installDebug
+```
+
+Или через Android Studio: **Run → Run 'app'**.
+
+## Используемые библиотеки
+
+- **Jetpack Compose** — UI
+- **Retrofit + OkHttp** — сетевые запросы
+- **kotlinx.serialization** — сериализация JSON
+- **Lifecycle ViewModel** — управление состоянием
