@@ -16,7 +16,13 @@ data class ChatResponse(
 data class Usage(
     val prompt_tokens: Int = 0,
     val completion_tokens: Int = 0,
-    val total_tokens: Int = 0
+    val total_tokens: Int = 0,
+    val prompt_tokens_details: PromptTokensDetails? = null,
+)
+
+@Serializable
+data class PromptTokensDetails(
+    val cached_tokens: Int = 0,
 )
 
 @Serializable

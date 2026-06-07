@@ -7,6 +7,7 @@ import com.example.myapplication.BuildConfig
 import com.example.myapplication.data.api.RetrofitFactory
 import com.example.myapplication.data.models.ChatMessage
 import com.example.myapplication.data.models.GenerationConfig
+import com.example.myapplication.data.models.MessageUsage
 import com.example.myapplication.data.models.GenerationPresets
 import com.example.myapplication.data.models.ModelInfo
 import com.example.myapplication.data.models.buildChatRequest
@@ -117,7 +118,19 @@ class ChatViewModel : ViewModel() {
 
             if (assistantMessage != null) {
                 val content = assistantMessage.content.orEmpty()
-                val newMessages = updatedMessages + ChatMessage(role = "assistant", content = content)
+                val messageUsage = response.usage?.let {
+                    MessageUsage(
+                        prompt_tokens = it.prompt_tokens,
+                        completion_tokens = it.completion_tokens,
+                        cached_tokens = it.prompt_tokens_details?.cached_tokens ?: 0,
+                    )
+                }
+                val newMessages = updatedMessages + ChatMessage(
+                    role = "assistant",
+                    content = content,
+                    usage = messageUsage,
+                    model = response.model,
+                )
                 _uiState.value = _uiState.value.copy(
                     messages = newMessages.toImmutableList(),
                     responseText = content,

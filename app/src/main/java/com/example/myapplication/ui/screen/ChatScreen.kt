@@ -1,5 +1,10 @@
 package com.example.myapplication.ui.screen
 
+import android.content.ClipData
+import android.content.Context
+import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,9 +47,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.data.models.ChatMessage
 import com.example.myapplication.data.models.ModelInfo
+import com.example.myapplication.data.models.Pricing
 import com.example.myapplication.ui.viewmodel.ChatViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -266,12 +273,23 @@ fun ModelSelector(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageBubble(message: ChatMessage) {
     val isUser = message.role == "user"
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = {},
+                onLongClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("message", message.content))
+                    Toast.makeText(context, "Скопировано", Toast.LENGTH_SHORT).show()
+                }
+            ),
         shape = RoundedCornerShape(
             topStart = 16.dp,
             topEnd = 16.dp,
@@ -300,6 +318,9 @@ fun MessageBubble(message: ChatMessage) {
             Spacer(modifier = Modifier.height(4.dp))
             if (message.role == "assistant") {
                 MarkdownText(markdown = message.content)
+                if (message.usage != null) {
+                    TokenUsageFooter(message)
+                }
             } else {
                 Text(
                     text = message.content,
@@ -308,4 +329,31 @@ fun MessageBubble(message: ChatMessage) {
             }
         }
     }
+}
+
+@Composable
+private fun TokenUsageFooter(message: ChatMessage) {
+    val usage = message.usage ?: return
+    val cost = message.model?.let { Pricing.calculateCost(it, usage) }
+
+    Spacer(modifier = Modifier.height(6.dp))
+    Text(
+        text = buildString {
+            append("\uD83C\uDFAF ")
+            append(usage.prompt_tokens)
+            append(" → ")
+            append(usage.completion_tokens)
+            append(" токенов")
+            if (usage.cached_tokens > 0) {
+                append(" | Кеш: ")
+                append(usage.cached_tokens)
+            }
+            if (cost != null) {
+                append(" | $")
+                append(String.format("%.5f", cost))
+            }
+        },
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
