@@ -30,12 +30,6 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Пробрасываем параметры из local.properties в BuildConfig
-        buildConfigField(
-            "String",
-            "BASE_URL",
-            "\"${localProperties.getProperty("base_url", "https://api.openai.com/")}\""
-        )
         buildConfigField(
             "String",
             "API_KEY",

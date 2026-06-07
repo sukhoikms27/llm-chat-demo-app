@@ -12,6 +12,8 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitFactory {
 
+    private const val BASE_URL = "https://api.z.ai/api/coding/paas/v4/"
+
     val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -38,7 +40,7 @@ object RetrofitFactory {
             .build()
     }
 
-    fun create(baseUrl: String = BuildConfig.BASE_URL, apiKey: String = BuildConfig.API_KEY): LlmApi {
+    fun create(baseUrl: String = BASE_URL, apiKey: String = BuildConfig.API_KEY): LlmApi {
         return Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(createOkHttpClient(apiKey))

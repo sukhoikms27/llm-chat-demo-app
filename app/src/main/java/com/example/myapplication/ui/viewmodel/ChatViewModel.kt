@@ -32,7 +32,7 @@ class ChatViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(
         ChatUiState(
-            isConfigured = BuildConfig.BASE_URL.isNotBlank() && BuildConfig.API_KEY.isNotBlank()
+            isConfigured = BuildConfig.API_KEY.isNotBlank()
         )
     )
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -57,10 +57,15 @@ class ChatViewModel : ViewModel() {
     fun loadModels() {
         viewModelScope.launch(exceptionHandler) {
             _uiState.value = _uiState.value.copy(isModelsLoading = true, error = null)
-            val response = api.getModels()
+            val models = listOf(
+                ModelInfo("GLM-5.1"),
+                ModelInfo("GLM-5"),
+                ModelInfo("GLM-5-Turbo"),
+                ModelInfo("GLM-4.7"),
+                ModelInfo("GLM-4.5-air"))
             _uiState.value = _uiState.value.copy(
-                models = response.data.toImmutableList(),
-                selectedModel = response.data.firstOrNull()?.id ?: "",
+                models = models,
+                selectedModel = models.firstOrNull()?.id ?: "",
                 isModelsLoading = false
             )
         }
