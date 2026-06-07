@@ -55,7 +55,7 @@ fun SettingsScreen(
         mutableStateOf(config.topP.toString())
     }
     var maxTokensText by remember(config.maxTokens) {
-        mutableStateOf(config.maxTokens.toString())
+        mutableStateOf(config.maxTokens?.toString().orEmpty())
     }
     var stopText by remember(config.stop) {
         mutableStateOf(config.stop?.joinToString(", ") ?: "")
@@ -154,7 +154,7 @@ fun SettingsScreen(
                     value = temperatureText,
                     onValueChange = { temperatureText = it },
                     label = { Text("Temperature") },
-                    supportingText = { Text("0.0 — детерминированно, 2.0 — хаотично") },
+                    supportingText = { Text("0.0 — 1.0 (по умолчанию 1.0)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -167,7 +167,7 @@ fun SettingsScreen(
                     value = topPText,
                     onValueChange = { topPText = it },
                     label = { Text("Top P") },
-                    supportingText = { Text("Nucleus sampling: 0.1 — сужает, 1.0 — всё разрешено") },
+                    supportingText = { Text("0.01 — 1.0 (по умолчанию 0.95)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -180,7 +180,7 @@ fun SettingsScreen(
                     value = maxTokensText,
                     onValueChange = { maxTokensText = it },
                     label = { Text("Max Tokens") },
-                    supportingText = { Text("Максимальное количество токенов в ответе") },
+                    supportingText = { Text("1 — 131072 (зависит от модели)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -193,7 +193,7 @@ fun SettingsScreen(
                     value = stopText,
                     onValueChange = { stopText = it },
                     label = { Text("Stop Sequences") },
-                    supportingText = { Text("Стоп-слова через запятую, напр.: \\n\\n, END") },
+                    supportingText = { Text("Стоп-слово (пока поддерживается только одно)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
