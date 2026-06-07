@@ -298,10 +298,14 @@ fun MessageBubble(message: ChatMessage) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = message.content,
-                style = MaterialTheme.typography.bodyMedium
-            )
+            if (message.role == "assistant") {
+                MarkdownText(markdown = message.content)
+            } else {
+                Text(
+                    text = message.content,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
     }
 }

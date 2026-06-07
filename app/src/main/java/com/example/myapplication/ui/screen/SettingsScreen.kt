@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.screen
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -11,8 +12,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -52,9 +57,6 @@ fun SettingsScreen(
     var maxTokensText by remember(config.maxTokens) {
         mutableStateOf(config.maxTokens.toString())
     }
-    var minTokensText by remember(config.minTokens) {
-        mutableStateOf(config.minTokens.toString())
-    }
     var stopText by remember(config.stop) {
         mutableStateOf(config.stop?.joinToString(", ") ?: "")
     }
@@ -66,15 +68,24 @@ fun SettingsScreen(
         temperature = temperatureText.toDoubleOrNull() ?: config.temperature,
         topP = topPText.toDoubleOrNull() ?: config.topP,
         maxTokens = maxTokensText.toIntOrNull() ?: config.maxTokens,
-        minTokens = minTokensText.toIntOrNull() ?: config.minTokens,
         stop = stopText.takeIf { it.isNotBlank() }?.split(",")?.map { it.trim() },
         systemPrompt = systemPromptText.takeIf { it.isNotBlank() }
     )
 
+    BackHandler(onBack = onBack)
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Настройки генерации") }
+                title = { Text("Настройки генерации") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Назад"
+                        )
+                    }
+                }
             )
         },
         modifier = Modifier.fillMaxSize()
@@ -117,7 +128,6 @@ fun SettingsScreen(
                                 temperatureText = preset.temperature.toString()
                                 topPText = preset.topP.toString()
                                 maxTokensText = preset.maxTokens.toString()
-                                minTokensText = preset.minTokens.toString()
                                 stopText = preset.stop?.joinToString(", ") ?: ""
                                 systemPromptText = preset.systemPrompt ?: ""
                             },
@@ -171,19 +181,6 @@ fun SettingsScreen(
                     onValueChange = { maxTokensText = it },
                     label = { Text("Max Tokens") },
                     supportingText = { Text("Максимальное количество токенов в ответе") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Min tokens
-                OutlinedTextField(
-                    value = minTokensText,
-                    onValueChange = { minTokensText = it },
-                    label = { Text("Min Tokens") },
-                    supportingText = { Text("Минимальное количество токенов в ответе") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
