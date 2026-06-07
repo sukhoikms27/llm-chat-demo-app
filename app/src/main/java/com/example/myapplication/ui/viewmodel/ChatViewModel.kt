@@ -116,10 +116,11 @@ class ChatViewModel : ViewModel() {
             val assistantMessage = response.choices.firstOrNull()?.message
 
             if (assistantMessage != null) {
-                val newMessages = updatedMessages + assistantMessage
+                val content = assistantMessage.content.orEmpty()
+                val newMessages = updatedMessages + ChatMessage(role = "assistant", content = content)
                 _uiState.value = _uiState.value.copy(
                     messages = newMessages.toImmutableList(),
-                    responseText = assistantMessage.content,
+                    responseText = content,
                     isLoading = false
                 )
             } else {

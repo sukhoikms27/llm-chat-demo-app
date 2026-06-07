@@ -7,22 +7,11 @@ package com.example.myapplication.data.models
  * Используется в ViewModel, может выноситься в настройки UI, сериализоваться в пресеты.
  */
 data class GenerationConfig(
-    val temperature: Double = 0.7,
-    val topP: Double = 1.0,
+    val temperature: Double = 1.0,
+    val topP: Double = 0.95,
     val maxTokens: Int = 2048,
-    val minTokens: Int = 0,
     val stop: List<String>? = null,
-    val stopTokenIds: List<Int>? = null,
     val systemPrompt: String? = null,
-    val frequencyPenalty: Double = 0.0,
-    val presencePenalty: Double = 0.0,
-    val repetitionPenalty: Double = 1.0,
-    val lengthPenalty: Double = 1.0,
-    val seed: Long? = null,
-    val topK: Int = -1,
-    val minP: Double = 0.0,
-    val logprobs: Boolean = false,
-    val topLogprobs: Int = 0,
     val user: String? = null,
 )
 
@@ -49,19 +38,8 @@ fun buildChatRequest(
         temperature = config.temperature,
         top_p = config.topP,
         max_tokens = config.maxTokens,
-        min_tokens = config.minTokens,
         stop = config.stop,
-        stop_token_ids = config.stopTokenIds,
-        frequency_penalty = config.frequencyPenalty,
-        presence_penalty = config.presencePenalty,
-        repetition_penalty = config.repetitionPenalty,
-        length_penalty = config.lengthPenalty,
-        seed = config.seed,
-        top_k = config.topK,
-        min_p = config.minP,
-        logprobs = config.logprobs,
-        top_logprobs = config.topLogprobs,
-        user = config.user,
+        user_id = config.user,
     )
 }
 
