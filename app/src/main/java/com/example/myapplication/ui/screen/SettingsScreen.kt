@@ -55,7 +55,7 @@ fun SettingsScreen(
         mutableStateOf(config.topP.toString())
     }
     var maxTokensText by remember(config.maxTokens) {
-        mutableStateOf(config.maxTokens.toString())
+        mutableStateOf(config.maxTokens?.toString().orEmpty())
     }
     var stopText by remember(config.stop) {
         mutableStateOf(config.stop?.joinToString(", ") ?: "")
