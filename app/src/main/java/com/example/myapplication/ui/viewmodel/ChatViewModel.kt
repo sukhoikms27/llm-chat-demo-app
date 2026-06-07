@@ -6,8 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.myapplication.BuildConfig
 import com.example.myapplication.data.api.RetrofitFactory
 import com.example.myapplication.data.models.ChatMessage
-import com.example.myapplication.data.models.ChatRequest
+import com.example.myapplication.data.models.GenerationConfig
+import com.example.myapplication.data.models.GenerationPresets
 import com.example.myapplication.data.models.ModelInfo
+import com.example.myapplication.data.models.buildChatRequest
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +27,9 @@ data class ChatUiState(
     val isLoading: Boolean = false,
     val isModelsLoading: Boolean = false,
     val error: String? = null,
-    val isConfigured: Boolean = true
+    val isConfigured: Boolean = true,
+    val generationConfig: GenerationConfig = GenerationPresets.default,
+    val isSettingsOpen: Boolean = false
 )
 
 class ChatViewModel : ViewModel() {
@@ -79,6 +83,14 @@ class ChatViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(inputText = text)
     }
 
+    fun onGenerationConfigChanged(config: GenerationConfig) {
+        _uiState.value = _uiState.value.copy(generationConfig = config)
+    }
+
+    fun setSettingsOpen(open: Boolean) {
+        _uiState.value = _uiState.value.copy(isSettingsOpen = open)
+    }
+
     fun sendMessage() {
         val state = _uiState.value
         val userMessage = state.inputText.trim()
@@ -95,9 +107,10 @@ class ChatViewModel : ViewModel() {
         )
 
         viewModelScope.launch(exceptionHandler) {
-            val request = ChatRequest(
+            val request = buildChatRequest(
                 model = state.selectedModel,
-                messages = updatedMessages
+                messages = updatedMessages,
+                config = state.generationConfig
             )
             val response = api.chatCompletions(request)
             val assistantMessage = response.choices.firstOrNull()?.message
