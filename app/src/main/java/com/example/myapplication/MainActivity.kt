@@ -8,12 +8,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.myapplication.ui.navigation.AppNavigation
-import com.example.myapplication.ui.theme.MyApplicationTheme
-import com.example.myapplication.ui.viewmodel.ChatViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.myapplication.presentation.navigation.AppNavigation
+import com.example.myapplication.presentation.navigation.Navigator
+import com.example.myapplication.presentation.theme.MyApplicationTheme
+import com.example.myapplication.presentation.viewmodel.ChatViewModel
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var navigator: Navigator
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -23,8 +31,11 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val viewModel: ChatViewModel = viewModel()
-                    AppNavigation(viewModel = viewModel)
+                    val viewModel: ChatViewModel = hiltViewModel()
+                    AppNavigation(
+                        navigator = navigator,
+                        viewModel = viewModel,
+                    )
                 }
             }
         }
