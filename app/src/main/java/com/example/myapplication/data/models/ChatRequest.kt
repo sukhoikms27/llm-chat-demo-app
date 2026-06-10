@@ -21,7 +21,16 @@ data class ChatRequest(
 data class ChatMessage(
     val role: String,
     val content: String,
-    val name: String? = null
+    val name: String? = null,
+    val usage: MessageUsage? = null,
+    val model: String? = null,
+)
+
+@Serializable
+data class MessageUsage(
+    val prompt_tokens: Int = 0,
+    val completion_tokens: Int = 0,
+    val cached_tokens: Int = 0,
 )
 
 @Serializable
