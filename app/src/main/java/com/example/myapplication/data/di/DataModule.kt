@@ -44,8 +44,8 @@ object DataModule {
             .addInterceptor(createAuthInterceptor())
             .addInterceptor(loggingInterceptor)
             .connectTimeout(90, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
-            .writeTimeout(120, TimeUnit.SECONDS)
+            .readTimeout(360, TimeUnit.SECONDS)
+            .writeTimeout(360, TimeUnit.SECONDS)
             .build()
     }
 
