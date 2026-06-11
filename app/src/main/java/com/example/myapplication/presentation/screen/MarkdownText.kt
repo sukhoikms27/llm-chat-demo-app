@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.screen
+package com.example.myapplication.presentation.screen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -8,13 +8,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
-
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -126,11 +124,9 @@ private fun parseMarkdownBlocks(text: String): List<MarkdownBlock> {
     while (i < lines.size) {
         val line = lines[i]
 
-        // Code block: ``` ... ```
         if (line.trimStart().startsWith("```")) {
             val fenceLen = line.trimStart().takeWhile { it == '`' }.length
             val codeLines = mutableListOf<String>()
-            // skip the opening fence line (and any language tag)
             i++
             while (i < lines.size) {
                 val codeLine = lines[i]
@@ -146,7 +142,6 @@ private fun parseMarkdownBlocks(text: String): List<MarkdownBlock> {
             continue
         }
 
-        // Heading
         val headingMatch = Regex("^(#{1,6})\\s+(.+)$").matchEntire(line)
         if (headingMatch != null) {
             val level = headingMatch.groupValues[1].length
@@ -156,7 +151,6 @@ private fun parseMarkdownBlocks(text: String): List<MarkdownBlock> {
             continue
         }
 
-        // Unordered list item: - or * followed by space
         val bulletMatch = Regex("^[-*]\\s+(.+)$").matchEntire(line)
         if (bulletMatch != null) {
             blocks.add(MarkdownBlock.ListItem(bulletMatch.groupValues[1], ordered = false, index = 0))
@@ -164,7 +158,6 @@ private fun parseMarkdownBlocks(text: String): List<MarkdownBlock> {
             continue
         }
 
-        // Ordered list item: 1. followed by space
         val orderedMatch = Regex("^(\\d+)[.)]\\s+(.+)$").matchEntire(line)
         if (orderedMatch != null) {
             val idx = orderedMatch.groupValues[1].toIntOrNull() ?: 1
@@ -173,13 +166,11 @@ private fun parseMarkdownBlocks(text: String): List<MarkdownBlock> {
             continue
         }
 
-        // Empty line — paragraph break
         if (line.isBlank()) {
             i++
             continue
         }
 
-        // Regular paragraph — collect consecutive non-special lines
         val paraLines = mutableListOf<String>()
         while (i < lines.size) {
             val pline = lines[i]
@@ -202,7 +193,6 @@ private fun parseMarkdownBlocks(text: String): List<MarkdownBlock> {
 @Composable
 private fun parseInlineStyles(text: String): AnnotatedString {
     return buildAnnotatedString {
-        // Pattern order matters: code first (greedy), then bold+italic, bold, italic
         val pattern = Regex(
             """(?<code>`[^`\n]+?`)|""" +
                     """(?<bolditalic>\*\*\*.+?\*\*\*)|""" +
@@ -214,7 +204,6 @@ private fun parseInlineStyles(text: String): AnnotatedString {
 
         var lastIndex = 0
         pattern.findAll(text).forEach { match ->
-            // Append plain text before this match
             if (match.range.first > lastIndex) {
                 append(text.substring(lastIndex, match.range.first))
             }
@@ -256,7 +245,6 @@ private fun parseInlineStyles(text: String): AnnotatedString {
             lastIndex = match.range.last + 1
         }
 
-        // Append remaining plain text
         if (lastIndex < text.length) {
             append(text.substring(lastIndex))
         }

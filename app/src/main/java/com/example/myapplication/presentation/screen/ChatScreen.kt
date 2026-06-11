@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.screen
+package com.example.myapplication.presentation.screen
 
 import android.content.ClipData
 import android.content.Context
@@ -47,12 +47,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.myapplication.data.models.ChatMessage
-import com.example.myapplication.data.models.ModelInfo
-import com.example.myapplication.data.models.Pricing
-import com.example.myapplication.ui.viewmodel.ChatViewModel
+import com.example.myapplication.domain.model.ChatMessage
+import com.example.myapplication.domain.model.MessageRole
+import com.example.myapplication.domain.model.ModelInfo
+import com.example.myapplication.domain.pricing.Pricing
+import com.example.myapplication.presentation.viewmodel.ChatViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -132,7 +133,7 @@ fun ChatScreen(
                     .weight(1f)
                     .fillMaxWidth()
             ) {
-                if (uiState.messages.isEmpty()) {
+                if (uiState.messages.isEmpty() && !uiState.isLoading) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -153,7 +154,12 @@ fun ChatScreen(
                         items(uiState.messages) { message ->
                             MessageBubble(message = message)
                         }
-                        if (uiState.isLoading) {
+                        // Streaming text preview
+                        if (uiState.isLoading && uiState.streamingText.isNotBlank()) {
+                            item {
+                                StreamingBubble(text = uiState.streamingText)
+                            }
+                        } else if (uiState.isLoading) {
                             item {
                                 Box(
                                     modifier = Modifier
@@ -210,6 +216,32 @@ fun ChatScreen(
                     Text("➤")
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun StreamingBubble(text: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(
+            topStart = 16.dp,
+            topEnd = 16.dp,
+            bottomStart = 16.dp,
+            bottomEnd = 4.dp
+        ),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "Ассистент ✨",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            MarkdownText(markdown = text)
         }
     }
 }
@@ -276,8 +308,8 @@ fun ModelSelector(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageBubble(message: ChatMessage) {
-    val isUser = message.role == "user"
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val isUser = message.role == MessageRole.USER
+    val context = LocalContext.current
 
     Card(
         modifier = Modifier
@@ -307,16 +339,15 @@ fun MessageBubble(message: ChatMessage) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 text = when (message.role) {
-                    "user" -> "Вы"
-                    "assistant" -> "Ассистент"
-                    "system" -> "Система"
-                    else -> message.role
+                    MessageRole.USER -> "Вы"
+                    MessageRole.ASSISTANT -> "Ассистент"
+                    MessageRole.SYSTEM -> "Система"
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(4.dp))
-            if (message.role == "assistant") {
+            if (message.role == MessageRole.ASSISTANT) {
                 MarkdownText(markdown = message.content)
                 if (message.usage != null) {
                     TokenUsageFooter(message)
@@ -340,13 +371,13 @@ private fun TokenUsageFooter(message: ChatMessage) {
     Text(
         text = buildString {
             append("\uD83C\uDFAF ")
-            append(usage.prompt_tokens)
+            append(usage.promptTokens)
             append(" → ")
-            append(usage.completion_tokens)
+            append(usage.completionTokens)
             append(" токенов")
-            if (usage.cached_tokens > 0) {
+            if (usage.cachedTokens > 0) {
                 append(" | Кеш: ")
-                append(usage.cached_tokens)
+                append(usage.cachedTokens)
             }
             if (cost != null) {
                 append(" | $")

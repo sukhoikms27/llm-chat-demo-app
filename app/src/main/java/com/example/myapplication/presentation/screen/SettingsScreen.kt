@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.screen
+package com.example.myapplication.presentation.screen
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
@@ -34,9 +34,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.myapplication.data.models.GenerationConfig
-import com.example.myapplication.data.models.GenerationPresets
-import com.example.myapplication.data.models.presetLabel
+import com.example.myapplication.domain.model.GenerationConfig
+import com.example.myapplication.domain.model.GenerationPresets
+import com.example.myapplication.domain.model.presetLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,7 +47,6 @@ fun SettingsScreen(
 ) {
     var config by remember(currentConfig) { mutableStateOf(currentConfig) }
 
-    // Текстовые поля для тонкой настройки (извлекаем из config)
     var temperatureText by remember(config.temperature) {
         mutableStateOf(config.temperature.toString())
     }
@@ -96,15 +95,13 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .imePadding()
         ) {
-            // Скроллируемый контент с нижним отступом под кнопку
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp)
-                    .padding(bottom = 72.dp) // отступ под кнопку (48dp высота + 16dp*2 padding)
+                    .padding(bottom = 72.dp)
             ) {
-                // Пресеты
                 Text(
                     text = "Пресеты",
                     style = MaterialTheme.typography.labelMedium,
@@ -124,7 +121,6 @@ fun SettingsScreen(
                             selected = index == selectedIndex,
                             onClick = {
                                 config = preset
-                                // Обновляем текстовые поля из пресета
                                 temperatureText = preset.temperature.toString()
                                 topPText = preset.topP.toString()
                                 maxTokensText = preset.maxTokens.toString()
@@ -140,7 +136,6 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Тонкая настройка
                 Text(
                     text = "Параметры",
                     style = MaterialTheme.typography.labelMedium,
@@ -149,7 +144,6 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Temperature
                 OutlinedTextField(
                     value = temperatureText,
                     onValueChange = { temperatureText = it },
@@ -162,7 +156,6 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Top P
                 OutlinedTextField(
                     value = topPText,
                     onValueChange = { topPText = it },
@@ -175,7 +168,6 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Max tokens
                 OutlinedTextField(
                     value = maxTokensText,
                     onValueChange = { maxTokensText = it },
@@ -188,7 +180,6 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Stop sequences
                 OutlinedTextField(
                     value = stopText,
                     onValueChange = { stopText = it },
@@ -201,7 +192,6 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // System prompt
                 OutlinedTextField(
                     value = systemPromptText,
                     onValueChange = { systemPromptText = it },
@@ -213,7 +203,6 @@ fun SettingsScreen(
                 )
             }
 
-            // Кнопка, прибитая к низу экрана
             Button(
                 onClick = {
                     onSave(buildConfigFromFields())
