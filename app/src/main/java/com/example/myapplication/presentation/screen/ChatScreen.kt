@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -41,7 +40,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -147,22 +145,10 @@ fun ChatScreen(
                         )
                     }
                 } else {
-                    val listState = rememberLazyListState()
-                    val totalItems = uiState.messages.size +
-                        (if (uiState.isLoading) 1 else 0)
-
-                    // Auto-scroll to bottom when new content arrives
-                    LaunchedEffect(uiState.streamingText, uiState.messages.size) {
-                        if (totalItems > 0) {
-                            listState.animateScrollToItem(totalItems - 1)
-                        }
-                    }
-
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 16.dp),
-                        state = listState,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(uiState.messages) { message ->
@@ -196,17 +182,6 @@ fun ChatScreen(
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                )
-            }
-
-            // Панель статистики токенов
-            if (uiState.totalTokens > 0) {
-                TokenStatsPanel(
-                    totalPromptTokens = uiState.totalPromptTokens,
-                    totalCompletionTokens = uiState.totalCompletionTokens,
-                    totalTokens = uiState.totalTokens,
-                    estimatedCost = uiState.estimatedCost,
-                    isStreaming = uiState.generationConfig.useStreaming,
                 )
             }
 
@@ -413,56 +388,3 @@ private fun TokenUsageFooter(message: ChatMessage) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
-
-@Composable
-private fun TokenStatsPanel(
-    totalPromptTokens: Int,
-    totalCompletionTokens: Int,
-    totalTokens: Int,
-    estimatedCost: Double,
-    isStreaming: Boolean,
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = buildString {
-                    append("📊 ")
-                    append(totalTokens)
-                    append(" токенов")
-                    append(" (вх: ")
-                    append(totalPromptTokens)
-                    append(" | вых: ")
-                    append(totalCompletionTokens)
-                    append(")")
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-            )
-            Text(
-                text = buildString {
-                    append(if (isStreaming) "⚡ Streaming" else "📝 Sync")
-                    append(" | $")
-                    append(String.format("%.5f", estimatedCost))
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-            )
-        }
-    }
-}
-
-

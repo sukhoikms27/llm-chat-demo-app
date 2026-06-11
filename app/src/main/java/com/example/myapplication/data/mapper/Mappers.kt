@@ -20,7 +20,6 @@ fun DomainChatMessage.toDto(): ChatMessage = ChatMessage(
     content = content,
     usage = usage?.toDto(),
     model = model,
-    reasoning_content = reasoningContent,
 )
 
 fun GenerationConfig.toDto(): GenerationConfigDto = GenerationConfigDto(
@@ -53,7 +52,6 @@ fun ChatMessage.toDomain(): DomainChatMessage = DomainChatMessage(
     content = content,
     usage = usage?.toDomain(),
     model = model,
-    reasoningContent = reasoning_content,
 )
 
 fun MessageUsage.toDomain(): DomainMessageUsage = DomainMessageUsage(
@@ -68,7 +66,6 @@ fun com.example.myapplication.data.models.ChatResponse.toDomain(): AgentResponse
         content = choice?.message?.content.orEmpty(),
         model = model,
         usage = usage?.toDomain(),
-        reasoningContent = choice?.message?.reasoning_content,
     )
 }
 
