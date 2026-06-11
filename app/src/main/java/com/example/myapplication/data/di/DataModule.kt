@@ -1,12 +1,19 @@
 package com.example.myapplication.data.di
 
+import android.content.Context
+import androidx.room.Room
 import com.example.myapplication.BuildConfig
 import com.example.myapplication.data.api.LlmApi
+import com.example.myapplication.data.local.AppDatabase
+import com.example.myapplication.data.local.ChatMessageDao
+import com.example.myapplication.data.repository.ChatHistoryRepositoryImpl
 import com.example.myapplication.data.repository.LlmRepositoryImpl
+import com.example.myapplication.domain.repository.ChatHistoryRepository
 import com.example.myapplication.domain.repository.LlmRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
 import okhttp3.Interceptor
@@ -32,6 +39,19 @@ object DataModule {
     @Provides
     @Singleton
     fun provideJson(): Json = json
+
+    @Provides
+    @Singleton
+    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
+        Room.databaseBuilder(context, AppDatabase::class.java, "llm-chat-db").build()
+
+    @Provides
+    fun provideChatMessageDao(db: AppDatabase): ChatMessageDao = db.chatMessageDao()
+
+    @Provides
+    @Singleton
+    fun provideChatHistoryRepository(dao: ChatMessageDao): ChatHistoryRepository =
+        ChatHistoryRepositoryImpl(dao)
 
     @Provides
     @Singleton

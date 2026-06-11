@@ -4,12 +4,14 @@ import com.example.myapplication.domain.model.AgentResponse
 import com.example.myapplication.domain.model.ChatMessage
 import com.example.myapplication.domain.model.GenerationConfig
 import com.example.myapplication.domain.model.MessageRole
+import com.example.myapplication.domain.repository.ChatHistoryRepository
 import com.example.myapplication.domain.repository.LlmRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 class LlmAgentImpl(
     private val repository: LlmRepository,
+    private val historyRepository: ChatHistoryRepository,
     initialModel: String,
     initialConfig: GenerationConfig = GenerationConfig(),
 ) : LlmAgent {
@@ -20,9 +22,17 @@ class LlmAgentImpl(
     private var currentModel: String = initialModel
     private var currentConfig: GenerationConfig = initialConfig
 
+    override suspend fun initialize() {
+        val saved = historyRepository.loadHistory()
+        if (saved.isNotEmpty()) {
+            _history.addAll(saved)
+        }
+    }
+
     override suspend fun send(message: String): Result<AgentResponse> = runCatching {
         val userMsg = ChatMessage(role = MessageRole.USER, content = message)
         _history += userMsg
+        historyRepository.saveMessage(userMsg)
 
         val response = repository.chat(currentModel, _history, currentConfig)
 
@@ -33,12 +43,14 @@ class LlmAgentImpl(
             model = response.model,
         )
         _history += assistantMsg
+        historyRepository.saveMessage(assistantMsg)
         response
     }
 
     override fun sendStream(message: String): Flow<String> = flow {
         val userMsg = ChatMessage(role = MessageRole.USER, content = message)
         _history += userMsg
+        historyRepository.saveMessage(userMsg)
 
         val fullContent = StringBuilder()
         repository.chatStream(currentModel, _history, currentConfig).collect { chunk ->
@@ -49,13 +61,16 @@ class LlmAgentImpl(
         val assistantMsg = ChatMessage(
             role = MessageRole.ASSISTANT,
             content = fullContent.toString(),
+            usage = null,
             model = currentModel,
         )
         _history += assistantMsg
+        historyRepository.saveMessage(assistantMsg)
     }
 
-    override fun clearHistory() {
+    override suspend fun clearHistory() {
         _history.clear()
+        historyRepository.clearHistory()
     }
 
     override fun setModel(modelId: String) {
