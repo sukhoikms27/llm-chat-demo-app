@@ -1,10 +1,9 @@
 package com.example.myapplication.presentation.di
 
-import com.example.myapplication.data.repository.LlmRepositoryImpl
 import com.example.myapplication.domain.agent.LlmAgent
 import com.example.myapplication.domain.agent.LlmAgentFactory
-import com.example.myapplication.domain.agent.LlmAgentImpl
-import com.example.myapplication.domain.model.GenerationConfig
+import com.example.myapplication.domain.agent.LlmAgentFactoryImpl
+import com.example.myapplication.domain.repository.ChatHistoryRepository
 import com.example.myapplication.domain.repository.LlmRepository
 import com.example.myapplication.presentation.navigation.Navigator
 import dagger.Module
@@ -19,13 +18,10 @@ object AgentModule {
 
     @Provides
     @ActivityRetainedScoped
-    fun provideAgentFactory(repository: LlmRepository): LlmAgentFactory {
-        return object : LlmAgentFactory {
-            override fun create(model: String, config: GenerationConfig): LlmAgent {
-                return LlmAgentImpl(repository, model, config)
-            }
-        }
-    }
+    fun provideAgentFactory(
+        repository: LlmRepository,
+        historyRepository: ChatHistoryRepository,
+    ): LlmAgentFactory = LlmAgentFactoryImpl(repository, historyRepository)
 
     @Provides
     @ActivityRetainedScoped

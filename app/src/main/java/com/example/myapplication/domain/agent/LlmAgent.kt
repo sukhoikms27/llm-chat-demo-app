@@ -7,9 +7,10 @@ import kotlinx.coroutines.flow.Flow
 
 interface LlmAgent {
     val conversationHistory: List<ChatMessage>
+    suspend fun initialize()
     suspend fun send(message: String): Result<AgentResponse>
     fun sendStream(message: String): Flow<String>
-    fun clearHistory()
+    suspend fun clearHistory()
     fun setModel(modelId: String)
     fun setGenerationConfig(config: GenerationConfig)
 }

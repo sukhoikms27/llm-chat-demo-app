@@ -29,6 +29,7 @@ data class ChatUiState(
     val streamingText: String = "",
     val isLoading: Boolean = false,
     val isModelsLoading: Boolean = false,
+    val isHistoryLoaded: Boolean = false,
     val error: String? = null,
     val isConfigured: Boolean = true,
     val generationConfig: GenerationConfig = GenerationPresets.default,
@@ -55,6 +56,13 @@ class ChatViewModel @Inject constructor(
     init {
         if (_uiState.value.isConfigured) {
             loadModels()
+        }
+        viewModelScope.launch {
+            agent.initialize()
+            _uiState.update { it.copy(
+                messages = agent.conversationHistory,
+                isHistoryLoaded = true,
+            ) }
         }
     }
 
@@ -114,10 +122,12 @@ class ChatViewModel @Inject constructor(
     }
 
     fun clearChat() {
-        agent.clearHistory()
-        _uiState.update { it.copy(
-            messages = emptyList(),
-            streamingText = "",
-        ) }
+        viewModelScope.launch {
+            agent.clearHistory()
+            _uiState.update { it.copy(
+                messages = emptyList(),
+                streamingText = "",
+            ) }
+        }
     }
 }
