@@ -4,4 +4,5 @@ data class AgentResponse(
     val content: String,
     val model: String,
     val usage: MessageUsage?,
+    val reasoningContent: String? = null,
 )

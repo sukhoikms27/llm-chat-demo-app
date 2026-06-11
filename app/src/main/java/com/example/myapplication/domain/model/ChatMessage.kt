@@ -5,6 +5,7 @@ data class ChatMessage(
     val content: String,
     val usage: MessageUsage? = null,
     val model: String? = null,
+    val reasoningContent: String? = null,
 )
 
 enum class MessageRole { SYSTEM, USER, ASSISTANT }
