@@ -20,6 +20,7 @@ interface LlmAgent {
     val conversationHistory: List<ChatMessage>
     val totalUsage: CumulativeUsage
     val currentSummary: ContextSummary?
+    val currentStrategyName: String
     suspend fun initialize(chatId: Long = 1L)
     suspend fun send(message: String, attachments: List<FileAttachment> = emptyList()): Result<com.example.myapplication.domain.model.AgentResponse>
     fun sendStream(message: String, attachments: List<FileAttachment> = emptyList()): Flow<StreamEvent>

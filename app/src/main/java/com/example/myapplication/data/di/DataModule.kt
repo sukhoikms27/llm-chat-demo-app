@@ -87,6 +87,7 @@ object DataModule {
     fun provideOkHttpClient(): OkHttpClient {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
+            redactHeader("Authorization")
         }
 
         return OkHttpClient.Builder()

@@ -17,4 +17,5 @@ data class GenerationConfig(
     val contextCompressionEnabled: Boolean = true,
     val recentMessageCount: Int = 6,
     val summarizeInterval: Int = 4,
+    val contextStrategy: ContextStrategyType = ContextStrategyType.SUMMARIZATION,
 )

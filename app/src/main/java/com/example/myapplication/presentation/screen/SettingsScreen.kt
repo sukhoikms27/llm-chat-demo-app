@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.myapplication.domain.model.ContextStrategyType
 import com.example.myapplication.domain.model.GenerationConfig
 import com.example.myapplication.domain.model.GenerationPresets
 import com.example.myapplication.domain.model.presetLabel
@@ -268,47 +269,60 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                // Strategy selector
+                Text(
+                    text = "Стратегия управления контекстом",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val strategies = ContextStrategyType.entries
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column {
-                        Text(
-                            text = "Сжатие истории",
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Text(
-                            text = "Автоматическое суммирование старых сообщений",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    strategies.forEachIndexed { index, strategy ->
+                        SegmentedButton(
+                            selected = config.contextStrategy == strategy,
+                            onClick = { config = config.copy(contextStrategy = strategy) },
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = index,
+                                count = strategies.size
+                            )
+                        ) {
+                            Text(strategy.displayName)
+                        }
                     }
-                    Switch(
-                        checked = config.contextCompressionEnabled,
-                        onCheckedChange = { config = config.copy(contextCompressionEnabled = it) },
-                    )
                 }
 
-                if (config.contextCompressionEnabled) {
-                    Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = when (config.contextStrategy) {
+                        ContextStrategyType.SLIDING_WINDOW -> "В запрос отправляются только последние N сообщений, остальное отбрасывается"
+                        ContextStrategyType.SUMMARIZATION -> "Автоматическое суммирование старых сообщений"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
 
-                    Text(
-                        text = "Последние сообщения: ${config.recentMessageCount}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Slider(
-                        value = config.recentMessageCount.toFloat(),
-                        onValueChange = { config = config.copy(recentMessageCount = it.toInt()) },
-                        valueRange = 2f..20f,
-                        steps = 17,
-                    )
-                    Text(
-                        text = "Сколько сообщений всегда передаются модели без сжатия",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Spacer(modifier = Modifier.height(16.dp))
 
+                Text(
+                    text = "Последние сообщения: ${config.recentMessageCount}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Slider(
+                    value = config.recentMessageCount.toFloat(),
+                    onValueChange = { config = config.copy(recentMessageCount = it.toInt()) },
+                    valueRange = 2f..20f,
+                    steps = 17,
+                )
+                Text(
+                    text = "Сколько сообщений всегда передаются модели",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                if (config.contextStrategy == ContextStrategyType.SUMMARIZATION) {
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Text(

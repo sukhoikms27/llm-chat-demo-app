@@ -4,6 +4,7 @@ import com.example.myapplication.domain.model.AgentResponse
 import com.example.myapplication.domain.model.ChatMessage
 import com.example.myapplication.domain.model.ContextSummary
 import com.example.myapplication.domain.model.FileAttachment
+import com.example.myapplication.domain.model.ContextStrategyType
 import com.example.myapplication.domain.model.GenerationConfig
 import com.example.myapplication.domain.model.MessageRole
 import com.example.myapplication.domain.model.MessageUsage
@@ -40,6 +41,15 @@ class LlmAgentImpl(
     private var _currentSummary: ContextSummary? = null
     override val currentSummary: ContextSummary? get() = _currentSummary
 
+    private var currentStrategy: ContextStrategy = createStrategy(initialConfig)
+    override val currentStrategyName: String get() = currentStrategy.displayName
+
+    private fun createStrategy(config: GenerationConfig): ContextStrategy =
+        when (config.contextStrategy) {
+            ContextStrategyType.SLIDING_WINDOW -> SlidingWindowStrategy()
+            ContextStrategyType.SUMMARIZATION -> SummaryStrategy(contextManager)
+        }
+
     override suspend fun initialize(chatId: Long) {
         currentChatId = chatId
         val saved = historyRepository.loadHistory(chatId)
@@ -64,11 +74,11 @@ class LlmAgentImpl(
         val userMsgId = historyRepository.saveMessage(userMsg)
         _history += userMsg.copy(id = userMsgId)
 
-        val contextForRequest = contextManager.buildContextForRequest(
+        val contextForRequest = currentStrategy.buildContext(
             _history, _currentSummary, currentConfig
         )
         Log.d(TAG, "send: historySize=${_history.size}, contextSent=${contextForRequest.size} msgs, " +
-            "hasSummary=${_currentSummary != null}, compression=${currentConfig.contextCompressionEnabled}")
+            "hasSummary=${_currentSummary != null}, strategy=${currentStrategyName}")
         val response = repository.chat(currentModel, contextForRequest, currentConfig)
 
         val assistantMsg = ChatMessage(
@@ -106,11 +116,11 @@ class LlmAgentImpl(
         val userMsgId = historyRepository.saveMessage(userMsg)
         _history += userMsg.copy(id = userMsgId)
 
-        val contextForRequest = contextManager.buildContextForRequest(
+        val contextForRequest = currentStrategy.buildContext(
             _history, _currentSummary, currentConfig
         )
         Log.d(TAG, "sendStream: historySize=${_history.size}, contextSent=${contextForRequest.size} msgs, " +
-            "hasSummary=${_currentSummary != null}, compression=${currentConfig.contextCompressionEnabled}")
+            "hasSummary=${_currentSummary != null}, strategy=${currentStrategyName}")
 
         val fullContent = StringBuilder()
         val fullReasoning = StringBuilder()
@@ -168,6 +178,7 @@ class LlmAgentImpl(
 
     override fun setGenerationConfig(config: GenerationConfig) {
         currentConfig = config
+        currentStrategy = createStrategy(config)
     }
 
     private fun accumulateUsage(usage: MessageUsage) {
@@ -192,9 +203,9 @@ class LlmAgentImpl(
     }
 
     private suspend fun maybeCompressHistory() {
-        if (!contextManager.needsCompression(_history, currentConfig)) {
+        if (!currentStrategy.needsCompression(_history, currentConfig)) {
             Log.d(TAG, "Compression check: not needed " +
-                "(historySize=${_history.size}, threshold=${currentConfig.recentMessageCount + currentConfig.summarizeInterval})")
+                "(historySize=${_history.size}, strategy=${currentStrategyName})")
             return
         }
 
