@@ -75,6 +75,7 @@ import com.example.myapplication.presentation.viewmodel.ChatViewModel
 fun ChatScreen(
     viewModel: ChatViewModel,
     onNavigateToSettings: () -> Unit,
+    onNavigateToStats: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -192,9 +193,8 @@ fun ChatScreen(
                 TokenStatsPanel(
                     totalPromptTokens = uiState.totalPromptTokens,
                     totalCompletionTokens = uiState.totalCompletionTokens,
-                    totalTokens = uiState.totalTokens,
-                    estimatedCost = uiState.estimatedCost,
-                    isStreaming = uiState.generationConfig.useStreaming,
+                    cachedTokens = uiState.messages.lastOrNull { it.usage != null }?.usage?.cachedTokens ?: 0,
+                    onClick = onNavigateToStats,
                 )
             }
 
@@ -427,9 +427,13 @@ private fun TokenUsageFooter(message: ChatMessage) {
 
 @Composable
 private fun TokenStatsPanel(
-    totalPromptTokens: Int, totalCompletionTokens: Int, totalTokens: Int, estimatedCost: Double, isStreaming: Boolean,
+    totalPromptTokens: Int,
+    totalCompletionTokens: Int,
+    cachedTokens: Int,
+    onClick: () -> Unit,
 ) {
     Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
@@ -439,12 +443,23 @@ private fun TokenStatsPanel(
             horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "📊 $totalTokens токенов (вх: $totalPromptTokens | вых: $totalCompletionTokens)",
-                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onTertiaryContainer,
+                text = buildString {
+                    append("📊 ")
+                    append(String.format("%,d", totalPromptTokens))
+                    append(" → ")
+                    append(String.format("%,d", totalCompletionTokens))
+                    if (cachedTokens > 0) {
+                        append(" | Кеш: ")
+                        append(String.format("%,d", cachedTokens))
+                    }
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
             )
             Text(
-                text = "${if (isStreaming) "⚡ Streaming" else "📝 Sync"} | \$${String.format("%.5f", estimatedCost)}",
-                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onTertiaryContainer,
+                text = "⏵",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
             )
         }
     }

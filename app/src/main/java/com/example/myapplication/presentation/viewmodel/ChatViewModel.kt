@@ -16,6 +16,7 @@ import com.example.myapplication.domain.model.ModelInfo
 import com.example.myapplication.domain.model.StreamEvent
 import com.example.myapplication.data.storage.FileStorage
 import com.example.myapplication.domain.repository.LlmRepository
+import com.example.myapplication.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,6 +44,9 @@ data class ChatUiState(
     val totalCompletionTokens: Int = 0,
     val totalTokens: Int = 0,
     val estimatedCost: Double = 0.0,
+    // Context management
+    val tokensSaved: Int = 0,
+    val hasActiveSummary: Boolean = false,
 )
 
 @HiltViewModel
@@ -51,6 +55,7 @@ class ChatViewModel @Inject constructor(
     private val repository: LlmRepository,
     private val application: Application,
     private val fileStorage: FileStorage,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -70,6 +75,13 @@ class ChatViewModel @Inject constructor(
             loadModels()
         }
         viewModelScope.launch {
+            // Load saved settings first
+            val savedConfig = settingsRepository.loadConfig()
+            if (savedConfig != null) {
+                agent.setGenerationConfig(savedConfig)
+                _uiState.update { it.copy(generationConfig = savedConfig) }
+            }
+
             agent.initialize()
             updateTokenStats()
             _uiState.update { it.copy(
@@ -100,6 +112,9 @@ class ChatViewModel @Inject constructor(
     fun onGenerationConfigChanged(config: GenerationConfig) {
         agent.setGenerationConfig(config)
         _uiState.update { it.copy(generationConfig = config) }
+        viewModelScope.launch {
+            settingsRepository.saveConfig(config)
+        }
     }
 
     fun addAttachment(attachment: FileAttachment) {
@@ -226,6 +241,8 @@ class ChatViewModel @Inject constructor(
             totalCompletionTokens = usage.totalCompletionTokens,
             totalTokens = usage.totalTokens,
             estimatedCost = usage.estimatedCost,
+            tokensSaved = usage.tokensSaved,
+            hasActiveSummary = agent.currentSummary != null,
         ) }
     }
 }

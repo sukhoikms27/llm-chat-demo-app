@@ -73,8 +73,8 @@ fun GenerationConfig.toDto(): GenerationConfigDto = GenerationConfigDto(
 )
 
 data class GenerationConfigDto(
-    val temperature: Double = 1.0,
-    val topP: Double = 0.95,
+    val temperature: Double? = null,
+    val topP: Double? = null,
     val maxTokens: Int? = null,
     val stop: List<String>? = null,
     val systemPrompt: String? = null,

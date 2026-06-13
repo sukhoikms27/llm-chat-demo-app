@@ -1,6 +1,9 @@
 package com.example.myapplication.domain.model
 
 data class ChatMessage(
+    val id: Long = 0,
+    val chatId: Long = 0,
+    val parentId: Long? = null,
     val role: MessageRole,
     val content: String,
     val usage: MessageUsage? = null,

@@ -1,10 +1,11 @@
 package com.example.myapplication.presentation.di
 
-import com.example.myapplication.domain.agent.LlmAgent
+import com.example.myapplication.domain.agent.ContextManager
 import com.example.myapplication.domain.agent.LlmAgentFactory
 import com.example.myapplication.domain.agent.LlmAgentFactoryImpl
 import com.example.myapplication.domain.repository.ChatHistoryRepository
 import com.example.myapplication.domain.repository.LlmRepository
+import com.example.myapplication.domain.repository.SettingsRepository
 import com.example.myapplication.presentation.navigation.Navigator
 import dagger.Module
 import dagger.Provides
@@ -21,7 +22,8 @@ object AgentModule {
     fun provideAgentFactory(
         repository: LlmRepository,
         historyRepository: ChatHistoryRepository,
-    ): LlmAgentFactory = LlmAgentFactoryImpl(repository, historyRepository)
+        contextManager: ContextManager,
+    ): LlmAgentFactory = LlmAgentFactoryImpl(repository, historyRepository, contextManager)
 
     @Provides
     @ActivityRetainedScoped
