@@ -1,6 +1,7 @@
 package com.example.myapplication.data.models
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class ChatRequest(
@@ -13,6 +14,7 @@ data class ChatRequest(
     val max_tokens: Int? = null,
     val stop: List<String>? = null,
     val response_format: ResponseFormat? = null,
+    val thinking: ThinkingConfig? = null,
     val request_id: String? = null,
     val user_id: String? = null,
 )
@@ -20,10 +22,11 @@ data class ChatRequest(
 @Serializable
 data class ChatMessage(
     val role: String,
-    val content: String,
+    val content: JsonElement,
     val name: String? = null,
     val usage: MessageUsage? = null,
     val model: String? = null,
+    val reasoning_content: String? = null,
 )
 
 @Serializable
@@ -36,4 +39,9 @@ data class MessageUsage(
 @Serializable
 data class ResponseFormat(
     val type: String = "text"
+)
+
+@Serializable
+data class ThinkingConfig(
+    val type: String, // "enabled" or "disabled"
 )

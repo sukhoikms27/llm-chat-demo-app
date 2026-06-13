@@ -2,8 +2,12 @@ package com.example.myapplication.domain.agent
 
 import com.example.myapplication.domain.model.AgentResponse
 import com.example.myapplication.domain.model.ChatMessage
+import com.example.myapplication.domain.model.FileAttachment
 import com.example.myapplication.domain.model.GenerationConfig
 import com.example.myapplication.domain.model.MessageRole
+import com.example.myapplication.domain.model.MessageUsage
+import com.example.myapplication.domain.model.StreamEvent
+import com.example.myapplication.domain.pricing.Pricing
 import com.example.myapplication.domain.repository.ChatHistoryRepository
 import com.example.myapplication.domain.repository.LlmRepository
 import kotlinx.coroutines.flow.Flow
@@ -22,15 +26,26 @@ class LlmAgentImpl(
     private var currentModel: String = initialModel
     private var currentConfig: GenerationConfig = initialConfig
 
+    private var _totalUsage = CumulativeUsage()
+    override val totalUsage: CumulativeUsage get() = _totalUsage
+
     override suspend fun initialize() {
         val saved = historyRepository.loadHistory()
         if (saved.isNotEmpty()) {
             _history.addAll(saved)
+            recalculateTotalUsage()
         }
     }
 
-    override suspend fun send(message: String): Result<AgentResponse> = runCatching {
-        val userMsg = ChatMessage(role = MessageRole.USER, content = message)
+    override suspend fun send(
+        message: String,
+        attachments: List<FileAttachment>,
+    ): Result<AgentResponse> = runCatching {
+        val userMsg = ChatMessage(
+            role = MessageRole.USER,
+            content = message,
+            attachments = attachments,
+        )
         _history += userMsg
         historyRepository.saveMessage(userMsg)
 
@@ -41,35 +56,66 @@ class LlmAgentImpl(
             content = response.content,
             usage = response.usage,
             model = response.model,
+            reasoningContent = response.reasoningContent,
         )
         _history += assistantMsg
         historyRepository.saveMessage(assistantMsg)
+
+        response.usage?.let { accumulateUsage(it) }
+
         response
     }
 
-    override fun sendStream(message: String): Flow<String> = flow {
-        val userMsg = ChatMessage(role = MessageRole.USER, content = message)
+    override fun sendStream(
+        message: String,
+        attachments: List<FileAttachment>,
+    ): Flow<StreamEvent> = flow {
+        val userMsg = ChatMessage(
+            role = MessageRole.USER,
+            content = message,
+            attachments = attachments,
+        )
         _history += userMsg
         historyRepository.saveMessage(userMsg)
 
         val fullContent = StringBuilder()
-        repository.chatStream(currentModel, _history, currentConfig).collect { chunk ->
-            fullContent.append(chunk)
-            emit(chunk)
+        val fullReasoning = StringBuilder()
+        var streamUsage: MessageUsage? = null
+
+        repository.chatStream(currentModel, _history, currentConfig).collect { event ->
+            when (event) {
+                is StreamEvent.Chunk -> {
+                    fullContent.append(event.content)
+                    emit(event)
+                }
+                is StreamEvent.ReasoningChunk -> {
+                    fullReasoning.append(event.content)
+                    emit(event)
+                }
+                is StreamEvent.Done -> {
+                    streamUsage = event.usage
+                }
+            }
         }
 
         val assistantMsg = ChatMessage(
             role = MessageRole.ASSISTANT,
             content = fullContent.toString(),
-            usage = null,
+            usage = streamUsage,
             model = currentModel,
+            reasoningContent = fullReasoning.toString().ifBlank { null },
         )
         _history += assistantMsg
         historyRepository.saveMessage(assistantMsg)
+
+        streamUsage?.let { accumulateUsage(it) }
+
+        emit(StreamEvent.Done(usage = streamUsage))
     }
 
     override suspend fun clearHistory() {
         _history.clear()
+        _totalUsage = CumulativeUsage()
         historyRepository.clearHistory()
     }
 
@@ -79,5 +125,40 @@ class LlmAgentImpl(
 
     override fun setGenerationConfig(config: GenerationConfig) {
         currentConfig = config
+    }
+
+    private fun accumulateUsage(usage: MessageUsage) {
+        val cost = Pricing.calculateCost(currentModel, usage) ?: 0.0
+        _totalUsage = _totalUsage.copy(
+            totalPromptTokens = _totalUsage.totalPromptTokens + usage.promptTokens,
+            totalCompletionTokens = _totalUsage.totalCompletionTokens + usage.completionTokens,
+            totalTokens = _totalUsage.totalTokens + usage.promptTokens + usage.completionTokens,
+            estimatedCost = _totalUsage.estimatedCost + cost,
+            messageCount = _totalUsage.messageCount + 1,
+        )
+    }
+
+    private fun recalculateTotalUsage() {
+        var promptTokens = 0
+        var completionTokens = 0
+        var cost = 0.0
+        var count = 0
+        for (msg in _history) {
+            msg.usage?.let { usage ->
+                promptTokens += usage.promptTokens
+                completionTokens += usage.completionTokens
+                msg.model?.let { model ->
+                    cost += Pricing.calculateCost(model, usage) ?: 0.0
+                }
+                count++
+            }
+        }
+        _totalUsage = CumulativeUsage(
+            totalPromptTokens = promptTokens,
+            totalCompletionTokens = completionTokens,
+            totalTokens = promptTokens + completionTokens,
+            estimatedCost = cost,
+            messageCount = count,
+        )
     }
 }

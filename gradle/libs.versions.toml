@@ -18,6 +18,7 @@ navigation3 = "1.1.2"
 ksp = "2.2.10-2.0.2"
 kotlinxCoroutinesTest = "1.10.1"
 room = "2.8.4"
+coil = "3.4.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -59,6 +60,9 @@ mockk = { group = "io.mockk", name = "mockk", version = "1.14.4" }
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+
+# Coil (image loading)
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

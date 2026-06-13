@@ -14,4 +14,5 @@ data class ChatMessageEntity(
     val cachedTokens: Int = 0,
     val model: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
+    val attachmentsJson: String? = null,
 )

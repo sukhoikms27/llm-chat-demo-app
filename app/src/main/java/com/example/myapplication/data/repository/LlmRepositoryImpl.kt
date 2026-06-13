@@ -9,6 +9,7 @@ import com.example.myapplication.domain.model.AgentResponse
 import com.example.myapplication.domain.model.ChatMessage
 import com.example.myapplication.domain.model.GenerationConfig
 import com.example.myapplication.domain.model.ModelInfo
+import com.example.myapplication.domain.model.StreamEvent
 import com.example.myapplication.domain.repository.LlmRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -40,7 +41,7 @@ class LlmRepositoryImpl @Inject constructor(
         model: String,
         messages: List<ChatMessage>,
         config: GenerationConfig,
-    ): Flow<String> = callbackFlow {
+    ): Flow<StreamEvent> = callbackFlow {
         val dtoMessages = messages.map { it.toDto() }
         val configDto = config.toDto()
         val request = buildChatRequest(model, dtoMessages, configDto, stream = true)
@@ -50,18 +51,31 @@ class LlmRepositoryImpl @Inject constructor(
             val source = response.source()
 
             try {
+                var lastUsage: com.example.myapplication.domain.model.MessageUsage? = null
                 while (!source.exhausted()) {
                     val line = source.readUtf8Line() ?: continue
                     if (line.startsWith("data: ")) {
                         val data = line.removePrefix("data: ").trim()
-                        if (data == "[DONE]") break
+                        if (data == "[DONE]") {
+                            trySend(StreamEvent.Done(usage = lastUsage))
+                            break
+                        }
                         val chunk = json.decodeFromString<StreamChunk>(data)
-                        val content = chunk.choices.firstOrNull()?.delta?.content
-                        if (content != null) {
-                            trySend(content)
+                        // Extract usage from any chunk that has it (typically the last one)
+                        chunk.usage?.toDomain()?.let { lastUsage = it }
+                        val delta = chunk.choices.firstOrNull()?.delta
+                        val content = delta?.content
+                        if (!content.isNullOrEmpty()) {
+                            trySend(StreamEvent.Chunk(content))
+                        }
+                        val reasoningContent = delta?.reasoning_content
+                        if (!reasoningContent.isNullOrEmpty()) {
+                            trySend(StreamEvent.ReasoningChunk(reasoningContent))
                         }
                     }
                 }
+                // If we never sent Done (no [DONE] marker), send it anyway
+                trySend(StreamEvent.Done(usage = lastUsage))
             } finally {
                 source.close()
                 response.close()
