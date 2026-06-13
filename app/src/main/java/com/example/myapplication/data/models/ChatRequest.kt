@@ -14,6 +14,7 @@ data class ChatRequest(
     val max_tokens: Int? = null,
     val stop: List<String>? = null,
     val response_format: ResponseFormat? = null,
+    val thinking: ThinkingConfig? = null,
     val request_id: String? = null,
     val user_id: String? = null,
 )
@@ -38,4 +39,9 @@ data class MessageUsage(
 @Serializable
 data class ResponseFormat(
     val type: String = "text"
+)
+
+@Serializable
+data class ThinkingConfig(
+    val type: String, // "enabled" or "disabled"
 )

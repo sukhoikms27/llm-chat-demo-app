@@ -71,7 +71,8 @@ fun SettingsScreen(
         topP = topPText.toDoubleOrNull() ?: config.topP,
         maxTokens = maxTokensText.toIntOrNull() ?: config.maxTokens,
         stop = stopText.takeIf { it.isNotBlank() }?.split(",")?.map { it.trim() },
-        systemPrompt = systemPromptText.takeIf { it.isNotBlank() }
+        systemPrompt = systemPromptText.takeIf { it.isNotBlank() },
+        enableThinking = config.enableThinking,
     )
 
     BackHandler(onBack = onBack)
@@ -159,6 +160,31 @@ fun SettingsScreen(
                     Switch(
                         checked = config.useStreaming,
                         onCheckedChange = { config = config.copy(useStreaming = it) },
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Thinking mode toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column {
+                        Text(
+                            text = "Thinking режим",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            text = if (config.enableThinking) "Модель рассуждает шаг за шагом" else "Обычный режим ответа",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = config.enableThinking,
+                        onCheckedChange = { config = config.copy(enableThinking = it) },
                     )
                 }
 

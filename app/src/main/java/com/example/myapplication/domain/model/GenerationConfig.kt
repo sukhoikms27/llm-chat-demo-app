@@ -9,4 +9,5 @@ data class GenerationConfig(
     val systemPrompt: String? = null,
     val user: String? = null,
     val useStreaming: Boolean = false,
+    val enableThinking: Boolean = false,
 )

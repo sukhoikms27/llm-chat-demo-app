@@ -3,6 +3,7 @@ package com.example.myapplication.data.mapper
 import com.example.myapplication.data.models.ChatMessage
 import com.example.myapplication.data.models.ChatRequest
 import com.example.myapplication.data.models.MessageUsage
+import com.example.myapplication.data.models.ThinkingConfig
 import com.example.myapplication.domain.model.AgentResponse
 import com.example.myapplication.domain.model.ChatMessage as DomainChatMessage
 import com.example.myapplication.domain.model.FileAttachment
@@ -68,6 +69,7 @@ fun GenerationConfig.toDto(): GenerationConfigDto = GenerationConfigDto(
     stop = stop,
     systemPrompt = systemPrompt,
     user = user,
+    enableThinking = enableThinking,
 )
 
 data class GenerationConfigDto(
@@ -77,6 +79,7 @@ data class GenerationConfigDto(
     val stop: List<String>? = null,
     val systemPrompt: String? = null,
     val user: String? = null,
+    val enableThinking: Boolean = false,
 )
 
 // DTO → Domain
@@ -162,6 +165,9 @@ fun buildChatRequest(
         max_tokens = configDto.maxTokens,
         stop = configDto.stop,
         stream = stream,
+        thinking = ThinkingConfig(
+            type = if (configDto.enableThinking) "enabled" else "disabled"
+        ),
         user_id = configDto.user,
     )
 }
