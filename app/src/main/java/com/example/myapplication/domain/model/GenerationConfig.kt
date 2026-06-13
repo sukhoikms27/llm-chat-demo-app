@@ -8,5 +8,5 @@ data class GenerationConfig(
     val stop: List<String>? = null,
     val systemPrompt: String? = null,
     val user: String? = null,
-    val useStreaming: Boolean = true,
+    val useStreaming: Boolean = false,
 )

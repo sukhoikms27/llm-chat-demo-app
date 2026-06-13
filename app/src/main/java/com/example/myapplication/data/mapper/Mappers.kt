@@ -5,23 +5,61 @@ import com.example.myapplication.data.models.ChatRequest
 import com.example.myapplication.data.models.MessageUsage
 import com.example.myapplication.domain.model.AgentResponse
 import com.example.myapplication.domain.model.ChatMessage as DomainChatMessage
+import com.example.myapplication.domain.model.FileAttachment
 import com.example.myapplication.domain.model.GenerationConfig
 import com.example.myapplication.domain.model.MessageRole
 import com.example.myapplication.domain.model.MessageUsage as DomainMessageUsage
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 // Domain → DTO
 
-fun DomainChatMessage.toDto(): ChatMessage = ChatMessage(
-    role = when (role) {
-        MessageRole.SYSTEM -> "system"
-        MessageRole.USER -> "user"
-        MessageRole.ASSISTANT -> "assistant"
-    },
-    content = content,
-    usage = usage?.toDto(),
-    model = model,
-    reasoning_content = reasoningContent,
-)
+fun DomainChatMessage.toDto(): ChatMessage {
+    val contentElement = if (attachments.isNotEmpty()) {
+        buildJsonArray {
+            add(buildJsonObject {
+                put("type", "text")
+                put("text", content)
+            })
+            for (att in attachments) {
+                when {
+                    att.mimeType.startsWith("image/") && att.base64Content != null -> {
+                        add(buildJsonObject {
+                            put("type", "image_url")
+                            put("image_url", buildJsonObject {
+                                put("url", "data:${att.mimeType};base64,${att.base64Content}")
+                            })
+                        })
+                    }
+                    att.base64Content != null -> {
+                        add(buildJsonObject {
+                            put("type", "text")
+                            put("text", "[File: ${att.fileName}]\n${att.base64Content}")
+                        })
+                    }
+                }
+            }
+        }
+    } else {
+        JsonPrimitive(content)
+    }
+
+    return ChatMessage(
+        role = when (role) {
+            MessageRole.SYSTEM -> "system"
+            MessageRole.USER -> "user"
+            MessageRole.ASSISTANT -> "assistant"
+        },
+        content = contentElement,
+        usage = usage?.toDto(),
+        model = model,
+        reasoning_content = reasoningContent,
+    )
+}
 
 fun GenerationConfig.toDto(): GenerationConfigDto = GenerationConfigDto(
     temperature = temperature,
@@ -43,18 +81,33 @@ data class GenerationConfigDto(
 
 // DTO → Domain
 
-fun ChatMessage.toDomain(): DomainChatMessage = DomainChatMessage(
-    role = when (role) {
-        "system" -> MessageRole.SYSTEM
-        "user" -> MessageRole.USER
-        "assistant" -> MessageRole.ASSISTANT
-        else -> MessageRole.USER
-    },
-    content = content,
-    usage = usage?.toDomain(),
-    model = model,
-    reasoningContent = reasoning_content,
-)
+fun ChatMessage.toDomain(): DomainChatMessage {
+    val textContent = when (val c = content) {
+        is JsonPrimitive -> c.content
+        is JsonArray -> {
+            // Extract text from first text part
+            c.firstNotNullOfOrNull { element ->
+                if (element is JsonObject && element["type"]?.toString()?.removeSurrounding("\"") == "text") {
+                    element["text"]?.toString()?.removeSurrounding("\"")
+                } else null
+            } ?: ""
+        }
+        else -> content.toString()
+    }
+
+    return DomainChatMessage(
+        role = when (role) {
+            "system" -> MessageRole.SYSTEM
+            "user" -> MessageRole.USER
+            "assistant" -> MessageRole.ASSISTANT
+            else -> MessageRole.USER
+        },
+        content = textContent,
+        usage = usage?.toDomain(),
+        model = model,
+        reasoningContent = reasoning_content,
+    )
+}
 
 fun MessageUsage.toDomain(): DomainMessageUsage = DomainMessageUsage(
     promptTokens = prompt_tokens,
@@ -91,8 +144,12 @@ fun buildChatRequest(
     configDto: GenerationConfigDto,
     stream: Boolean = false,
 ): ChatRequest {
-    val finalMessages = if (configDto.systemPrompt != null && messages.none { it.role == "system" }) {
-        listOf(ChatMessage(role = "system", content = configDto.systemPrompt)) + messages
+    val systemMsg = configDto.systemPrompt?.let { prompt ->
+        ChatMessage(role = "system", content = JsonPrimitive(prompt))
+    }
+
+    val finalMessages = if (systemMsg != null && messages.none { it.role == "system" }) {
+        listOf(systemMsg) + messages
     } else {
         messages
     }

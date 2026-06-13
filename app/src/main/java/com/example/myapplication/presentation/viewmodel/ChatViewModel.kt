@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.viewmodel
 
+import android.app.Application
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,10 +8,13 @@ import com.example.myapplication.BuildConfig
 import com.example.myapplication.domain.agent.LlmAgent
 import com.example.myapplication.domain.agent.LlmAgentFactory
 import com.example.myapplication.domain.model.ChatMessage
+import com.example.myapplication.domain.model.FileAttachment
 import com.example.myapplication.domain.model.GenerationConfig
 import com.example.myapplication.domain.model.GenerationPresets
+import com.example.myapplication.domain.model.MessageRole
 import com.example.myapplication.domain.model.ModelInfo
 import com.example.myapplication.domain.model.StreamEvent
+import com.example.myapplication.data.storage.FileStorage
 import com.example.myapplication.domain.repository.LlmRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +37,7 @@ data class ChatUiState(
     val error: String? = null,
     val isConfigured: Boolean = true,
     val generationConfig: GenerationConfig = GenerationPresets.default,
+    val pendingAttachments: List<FileAttachment> = emptyList(),
     // Token stats
     val totalPromptTokens: Int = 0,
     val totalCompletionTokens: Int = 0,
@@ -44,6 +49,8 @@ data class ChatUiState(
 class ChatViewModel @Inject constructor(
     private val agentFactory: LlmAgentFactory,
     private val repository: LlmRepository,
+    private val application: Application,
+    private val fileStorage: FileStorage,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -95,15 +102,37 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(generationConfig = config) }
     }
 
+    fun addAttachment(attachment: FileAttachment) {
+        _uiState.update { it.copy(pendingAttachments = it.pendingAttachments + attachment) }
+    }
+
+    fun removeAttachment(index: Int) {
+        _uiState.update { it.copy(pendingAttachments = it.pendingAttachments.toMutableList().apply { removeAt(index) }) }
+    }
+
     fun sendMessage() {
         val state = _uiState.value
         val userMessage = state.inputText.trim()
-        if (userMessage.isEmpty() || state.selectedModel.isEmpty()) return
+        if ((userMessage.isEmpty() && state.pendingAttachments.isEmpty()) || state.selectedModel.isEmpty()) return
+
+        val attachments = state.pendingAttachments.map { attachment ->
+            if (attachment.base64Content != null) return@map attachment
+
+            when {
+                attachment.mimeType.startsWith("image/") -> fileStorage.loadBase64(attachment)
+                fileStorage.isTextType(attachment.mimeType) -> {
+                    val text = fileStorage.readTextContent(attachment)
+                    if (text != null) attachment.copy(base64Content = text) else attachment
+                }
+                else -> fileStorage.loadBase64(attachment)
+            }
+        }
 
         // Add user message to UI immediately
         val userMsg = ChatMessage(
-            role = com.example.myapplication.domain.model.MessageRole.USER,
+            role = MessageRole.USER,
             content = userMessage,
+            attachments = attachments,
         )
 
         _uiState.update { it.copy(
@@ -112,28 +141,29 @@ class ChatViewModel @Inject constructor(
             streamingText = "",
             error = null,
             messages = it.messages + userMsg,
+            pendingAttachments = emptyList(),
         ) }
 
         if (state.generationConfig.useStreaming) {
-            sendStreaming(userMessage)
+            sendStreaming(userMessage, attachments)
         } else {
-            sendNonStreaming(userMessage)
+            sendNonStreaming(userMessage, attachments)
         }
     }
 
-    private fun sendStreaming(message: String) {
+    private fun sendStreaming(message: String, attachments: List<FileAttachment>) {
         viewModelScope.launch {
             try {
-                agent.sendStream(message).collect { event ->
+                agent.sendStream(message, attachments).collect { event ->
                     when (event) {
                         is StreamEvent.Chunk -> {
                             _uiState.update { it.copy(streamingText = it.streamingText + event.content) }
                         }
                         is StreamEvent.ReasoningChunk -> {
-                            // Reasoning handled internally, not shown in UI
+                            // Reasoning handled internally
                         }
                         is StreamEvent.Done -> {
-                            // Streaming finished — usage is available
+                            // Streaming finished
                         }
                     }
                 }
@@ -153,10 +183,10 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun sendNonStreaming(message: String) {
+    private fun sendNonStreaming(message: String, attachments: List<FileAttachment>) {
         viewModelScope.launch {
             try {
-                val result = agent.send(message)
+                val result = agent.send(message, attachments)
                 if (result.isFailure) {
                     _uiState.update { it.copy(
                         isLoading = false,

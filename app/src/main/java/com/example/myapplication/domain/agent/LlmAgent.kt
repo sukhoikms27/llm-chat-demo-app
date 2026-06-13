@@ -2,6 +2,7 @@ package com.example.myapplication.domain.agent
 
 import com.example.myapplication.domain.model.AgentResponse
 import com.example.myapplication.domain.model.ChatMessage
+import com.example.myapplication.domain.model.FileAttachment
 import com.example.myapplication.domain.model.GenerationConfig
 import com.example.myapplication.domain.model.StreamEvent
 import kotlinx.coroutines.flow.Flow
@@ -18,8 +19,8 @@ interface LlmAgent {
     val conversationHistory: List<ChatMessage>
     val totalUsage: CumulativeUsage
     suspend fun initialize()
-    suspend fun send(message: String): Result<AgentResponse>
-    fun sendStream(message: String): Flow<StreamEvent>
+    suspend fun send(message: String, attachments: List<FileAttachment> = emptyList()): Result<AgentResponse>
+    fun sendStream(message: String, attachments: List<FileAttachment> = emptyList()): Flow<StreamEvent>
     suspend fun clearHistory()
     fun setModel(modelId: String)
     fun setGenerationConfig(config: GenerationConfig)

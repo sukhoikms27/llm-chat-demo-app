@@ -2,6 +2,7 @@ package com.example.myapplication.domain.agent
 
 import com.example.myapplication.domain.model.AgentResponse
 import com.example.myapplication.domain.model.ChatMessage
+import com.example.myapplication.domain.model.FileAttachment
 import com.example.myapplication.domain.model.GenerationConfig
 import com.example.myapplication.domain.model.MessageRole
 import com.example.myapplication.domain.model.MessageUsage
@@ -32,13 +33,19 @@ class LlmAgentImpl(
         val saved = historyRepository.loadHistory()
         if (saved.isNotEmpty()) {
             _history.addAll(saved)
-            // Recalculate cumulative usage from saved history
             recalculateTotalUsage()
         }
     }
 
-    override suspend fun send(message: String): Result<AgentResponse> = runCatching {
-        val userMsg = ChatMessage(role = MessageRole.USER, content = message)
+    override suspend fun send(
+        message: String,
+        attachments: List<FileAttachment>,
+    ): Result<AgentResponse> = runCatching {
+        val userMsg = ChatMessage(
+            role = MessageRole.USER,
+            content = message,
+            attachments = attachments,
+        )
         _history += userMsg
         historyRepository.saveMessage(userMsg)
 
@@ -54,14 +61,20 @@ class LlmAgentImpl(
         _history += assistantMsg
         historyRepository.saveMessage(assistantMsg)
 
-        // Update cumulative usage
         response.usage?.let { accumulateUsage(it) }
 
         response
     }
 
-    override fun sendStream(message: String): Flow<StreamEvent> = flow {
-        val userMsg = ChatMessage(role = MessageRole.USER, content = message)
+    override fun sendStream(
+        message: String,
+        attachments: List<FileAttachment>,
+    ): Flow<StreamEvent> = flow {
+        val userMsg = ChatMessage(
+            role = MessageRole.USER,
+            content = message,
+            attachments = attachments,
+        )
         _history += userMsg
         historyRepository.saveMessage(userMsg)
 
@@ -95,10 +108,8 @@ class LlmAgentImpl(
         _history += assistantMsg
         historyRepository.saveMessage(assistantMsg)
 
-        // Update cumulative usage
         streamUsage?.let { accumulateUsage(it) }
 
-        // Emit Done so the caller knows streaming finished with usage info
         emit(StreamEvent.Done(usage = streamUsage))
     }
 

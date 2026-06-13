@@ -1,6 +1,7 @@
 package com.example.myapplication.data.models
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class ChatRequest(
@@ -20,7 +21,7 @@ data class ChatRequest(
 @Serializable
 data class ChatMessage(
     val role: String,
-    val content: String,
+    val content: JsonElement,
     val name: String? = null,
     val usage: MessageUsage? = null,
     val model: String? = null,

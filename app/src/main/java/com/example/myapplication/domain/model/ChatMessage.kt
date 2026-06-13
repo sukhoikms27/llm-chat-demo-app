@@ -6,6 +6,7 @@ data class ChatMessage(
     val usage: MessageUsage? = null,
     val model: String? = null,
     val reasoningContent: String? = null,
+    val attachments: List<FileAttachment> = emptyList(),
 )
 
 enum class MessageRole { SYSTEM, USER, ASSISTANT }

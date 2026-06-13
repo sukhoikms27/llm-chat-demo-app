@@ -6,6 +6,7 @@ import com.example.myapplication.BuildConfig
 import com.example.myapplication.data.api.LlmApi
 import com.example.myapplication.data.local.AppDatabase
 import com.example.myapplication.data.local.ChatMessageDao
+import com.example.myapplication.data.local.MIGRATION_1_2
 import com.example.myapplication.data.repository.ChatHistoryRepositoryImpl
 import com.example.myapplication.data.repository.LlmRepositoryImpl
 import com.example.myapplication.domain.repository.ChatHistoryRepository
@@ -43,7 +44,9 @@ object DataModule {
     @Provides
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, "llm-chat-db").build()
+        Room.databaseBuilder(context, AppDatabase::class.java, "llm-chat-db")
+            .addMigrations(MIGRATION_1_2)
+            .build()
 
     @Provides
     fun provideChatMessageDao(db: AppDatabase): ChatMessageDao = db.chatMessageDao()
