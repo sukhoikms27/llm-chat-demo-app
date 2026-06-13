@@ -6,6 +6,8 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import com.example.myapplication.presentation.screen.ChatScreen
 import com.example.myapplication.presentation.screen.SettingsScreen
+import com.example.myapplication.presentation.screen.StatsScreen
+import com.example.myapplication.domain.model.MessageRole
 import com.example.myapplication.presentation.viewmodel.ChatViewModel
 
 @Composable
@@ -21,6 +23,7 @@ fun AppNavigation(
                 ChatScreen(
                     viewModel = viewModel,
                     onNavigateToSettings = { navigator.goTo(NavKey.Settings) },
+                    onNavigateToStats = { navigator.goTo(NavKey.Stats) },
                 )
             }
             entry<NavKey.Settings> {
@@ -30,6 +33,20 @@ fun AppNavigation(
                         viewModel.onGenerationConfigChanged(config)
                         navigator.goBack()
                     },
+                    onBack = { navigator.goBack() },
+                )
+            }
+            entry<NavKey.Stats> {
+                val state = viewModel.uiState.value
+                StatsScreen(
+                    totalPromptTokens = state.totalPromptTokens,
+                    totalCompletionTokens = state.totalCompletionTokens,
+                    totalTokens = state.totalTokens,
+                    estimatedCost = state.estimatedCost,
+                    messageCount = state.messages.count { it.role == MessageRole.ASSISTANT },
+                    tokensSaved = state.tokensSaved,
+                    hasActiveSummary = state.hasActiveSummary,
+                    isStreaming = state.generationConfig.useStreaming,
                     onBack = { navigator.goBack() },
                 )
             }

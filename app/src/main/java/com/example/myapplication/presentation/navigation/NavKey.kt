@@ -9,4 +9,7 @@ sealed interface NavKey {
 
     @Serializable
     data object Settings : NavKey
+
+    @Serializable
+    data object Stats : NavKey
 }

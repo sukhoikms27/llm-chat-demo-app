@@ -21,15 +21,18 @@ class LlmAgentImplTest {
 
     private lateinit var repository: LlmRepository
     private lateinit var historyRepository: ChatHistoryRepository
+    private lateinit var contextManager: ContextManager
     private lateinit var agent: LlmAgentImpl
 
     @Before
     fun setUp() {
         repository = mockk(relaxed = true)
         historyRepository = mockk(relaxed = true)
+        contextManager = ContextManager()
         agent = LlmAgentImpl(
             repository = repository,
             historyRepository = historyRepository,
+            contextManager = contextManager,
             initialModel = "test-model",
             initialConfig = GenerationConfig(),
         )

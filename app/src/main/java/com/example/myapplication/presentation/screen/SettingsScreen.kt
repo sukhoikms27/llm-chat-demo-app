@@ -26,6 +26,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -67,8 +68,8 @@ fun SettingsScreen(
     }
 
     fun buildConfigFromFields(): GenerationConfig = config.copy(
-        temperature = temperatureText.toDoubleOrNull() ?: config.temperature,
-        topP = topPText.toDoubleOrNull() ?: config.topP,
+        temperature = temperatureText.toDoubleOrNull(),
+        topP = topPText.toDoubleOrNull(),
         maxTokens = maxTokensText.toIntOrNull() ?: config.maxTokens,
         stop = stopText.takeIf { it.isNotBlank() }?.split(",")?.map { it.trim() },
         systemPrompt = systemPromptText.takeIf { it.isNotBlank() },
@@ -125,9 +126,9 @@ fun SettingsScreen(
                             selected = index == selectedIndex,
                             onClick = {
                                 config = preset
-                                temperatureText = preset.temperature.toString()
-                                topPText = preset.topP.toString()
-                                maxTokensText = preset.maxTokens.toString()
+                                temperatureText = preset.temperature?.toString() ?: ""
+                                topPText = preset.topP?.toString() ?: ""
+                                maxTokensText = preset.maxTokens?.toString() ?: ""
                                 stopText = preset.stop?.joinToString(", ") ?: ""
                                 systemPromptText = preset.systemPrompt ?: ""
                             },
@@ -255,6 +256,77 @@ fun SettingsScreen(
                     shape = RoundedCornerShape(12.dp),
                     minLines = 2
                 )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // --- Context Management ---
+                Text(
+                    text = "Управление контекстом",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column {
+                        Text(
+                            text = "Сжатие истории",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            text = "Автоматическое суммирование старых сообщений",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = config.contextCompressionEnabled,
+                        onCheckedChange = { config = config.copy(contextCompressionEnabled = it) },
+                    )
+                }
+
+                if (config.contextCompressionEnabled) {
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Последние сообщения: ${config.recentMessageCount}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Slider(
+                        value = config.recentMessageCount.toFloat(),
+                        onValueChange = { config = config.copy(recentMessageCount = it.toInt()) },
+                        valueRange = 2f..20f,
+                        steps = 17,
+                    )
+                    Text(
+                        text = "Сколько сообщений всегда передаются модели без сжатия",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Интервал сжатия: ${config.summarizeInterval}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Slider(
+                        value = config.summarizeInterval.toFloat(),
+                        onValueChange = { config = config.copy(summarizeInterval = it.toInt()) },
+                        valueRange = 2f..10f,
+                        steps = 7,
+                    )
+                    Text(
+                        text = "Сколько новых сообщений накапливается перед очередным сжатием",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             Button(

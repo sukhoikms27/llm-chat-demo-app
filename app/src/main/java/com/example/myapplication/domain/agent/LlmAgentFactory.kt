@@ -11,8 +11,9 @@ interface LlmAgentFactory {
 class LlmAgentFactoryImpl(
     private val repository: LlmRepository,
     private val historyRepository: ChatHistoryRepository,
+    private val contextManager: ContextManager,
 ) : LlmAgentFactory {
     override fun create(model: String, config: GenerationConfig): LlmAgent {
-        return LlmAgentImpl(repository, historyRepository, model, config)
+        return LlmAgentImpl(repository, historyRepository, contextManager, model, config)
     }
 }

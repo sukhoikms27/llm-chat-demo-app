@@ -2,11 +2,13 @@ package com.example.myapplication.domain.agent
 
 import com.example.myapplication.domain.model.AgentResponse
 import com.example.myapplication.domain.model.ChatMessage
+import com.example.myapplication.domain.model.ContextSummary
 import com.example.myapplication.domain.model.FileAttachment
 import com.example.myapplication.domain.model.GenerationConfig
 import com.example.myapplication.domain.model.MessageRole
 import com.example.myapplication.domain.model.MessageUsage
 import com.example.myapplication.domain.model.StreamEvent
+import android.util.Log
 import com.example.myapplication.domain.pricing.Pricing
 import com.example.myapplication.domain.repository.ChatHistoryRepository
 import com.example.myapplication.domain.repository.LlmRepository
@@ -16,25 +18,36 @@ import kotlinx.coroutines.flow.flow
 class LlmAgentImpl(
     private val repository: LlmRepository,
     private val historyRepository: ChatHistoryRepository,
+    private val contextManager: ContextManager,
     initialModel: String,
     initialConfig: GenerationConfig = GenerationConfig(),
 ) : LlmAgent {
+
+    companion object {
+        private const val TAG = "LlmAgent"
+    }
 
     private val _history = mutableListOf<ChatMessage>()
     override val conversationHistory: List<ChatMessage> get() = _history.toList()
 
     private var currentModel: String = initialModel
     private var currentConfig: GenerationConfig = initialConfig
+    private var currentChatId: Long = 1L
 
     private var _totalUsage = CumulativeUsage()
     override val totalUsage: CumulativeUsage get() = _totalUsage
 
-    override suspend fun initialize() {
-        val saved = historyRepository.loadHistory()
+    private var _currentSummary: ContextSummary? = null
+    override val currentSummary: ContextSummary? get() = _currentSummary
+
+    override suspend fun initialize(chatId: Long) {
+        currentChatId = chatId
+        val saved = historyRepository.loadHistory(chatId)
         if (saved.isNotEmpty()) {
             _history.addAll(saved)
             recalculateTotalUsage()
         }
+        _currentSummary = historyRepository.loadLatestSummary(chatId)
     }
 
     override suspend fun send(
@@ -42,27 +55,40 @@ class LlmAgentImpl(
         attachments: List<FileAttachment>,
     ): Result<AgentResponse> = runCatching {
         val userMsg = ChatMessage(
+            chatId = currentChatId,
+            parentId = _history.lastOrNull()?.id,
             role = MessageRole.USER,
             content = message,
             attachments = attachments,
         )
-        _history += userMsg
-        historyRepository.saveMessage(userMsg)
+        val userMsgId = historyRepository.saveMessage(userMsg)
+        _history += userMsg.copy(id = userMsgId)
 
-        val response = repository.chat(currentModel, _history, currentConfig)
+        val contextForRequest = contextManager.buildContextForRequest(
+            _history, _currentSummary, currentConfig
+        )
+        Log.d(TAG, "send: historySize=${_history.size}, contextSent=${contextForRequest.size} msgs, " +
+            "hasSummary=${_currentSummary != null}, compression=${currentConfig.contextCompressionEnabled}")
+        val response = repository.chat(currentModel, contextForRequest, currentConfig)
 
         val assistantMsg = ChatMessage(
+            chatId = currentChatId,
+            parentId = userMsgId,
             role = MessageRole.ASSISTANT,
             content = response.content,
             usage = response.usage,
             model = response.model,
             reasoningContent = response.reasoningContent,
         )
-        _history += assistantMsg
-        historyRepository.saveMessage(assistantMsg)
+        val assistantMsgId = historyRepository.saveMessage(assistantMsg)
+        _history += assistantMsg.copy(id = assistantMsgId)
 
         response.usage?.let { accumulateUsage(it) }
+        trackTokenSavings(contextForRequest)
 
+        maybeCompressHistory()
+
+        historyRepository.touchChat(currentChatId)
         response
     }
 
@@ -71,18 +97,26 @@ class LlmAgentImpl(
         attachments: List<FileAttachment>,
     ): Flow<StreamEvent> = flow {
         val userMsg = ChatMessage(
+            chatId = currentChatId,
+            parentId = _history.lastOrNull()?.id,
             role = MessageRole.USER,
             content = message,
             attachments = attachments,
         )
-        _history += userMsg
-        historyRepository.saveMessage(userMsg)
+        val userMsgId = historyRepository.saveMessage(userMsg)
+        _history += userMsg.copy(id = userMsgId)
+
+        val contextForRequest = contextManager.buildContextForRequest(
+            _history, _currentSummary, currentConfig
+        )
+        Log.d(TAG, "sendStream: historySize=${_history.size}, contextSent=${contextForRequest.size} msgs, " +
+            "hasSummary=${_currentSummary != null}, compression=${currentConfig.contextCompressionEnabled}")
 
         val fullContent = StringBuilder()
         val fullReasoning = StringBuilder()
         var streamUsage: MessageUsage? = null
 
-        repository.chatStream(currentModel, _history, currentConfig).collect { event ->
+        repository.chatStream(currentModel, contextForRequest, currentConfig).collect { event ->
             when (event) {
                 is StreamEvent.Chunk -> {
                     fullContent.append(event.content)
@@ -99,16 +133,23 @@ class LlmAgentImpl(
         }
 
         val assistantMsg = ChatMessage(
+            chatId = currentChatId,
+            parentId = userMsgId,
             role = MessageRole.ASSISTANT,
             content = fullContent.toString(),
             usage = streamUsage,
             model = currentModel,
             reasoningContent = fullReasoning.toString().ifBlank { null },
         )
-        _history += assistantMsg
-        historyRepository.saveMessage(assistantMsg)
+        val assistantMsgId = historyRepository.saveMessage(assistantMsg)
+        _history += assistantMsg.copy(id = assistantMsgId)
 
         streamUsage?.let { accumulateUsage(it) }
+        trackTokenSavings(contextForRequest)
+
+        maybeCompressHistory()
+
+        historyRepository.touchChat(currentChatId)
 
         emit(StreamEvent.Done(usage = streamUsage))
     }
@@ -116,7 +157,9 @@ class LlmAgentImpl(
     override suspend fun clearHistory() {
         _history.clear()
         _totalUsage = CumulativeUsage()
-        historyRepository.clearHistory()
+        _currentSummary = null
+        historyRepository.clearHistory(currentChatId)
+        historyRepository.clearSummary(currentChatId)
     }
 
     override fun setModel(modelId: String) {
@@ -136,6 +179,60 @@ class LlmAgentImpl(
             estimatedCost = _totalUsage.estimatedCost + cost,
             messageCount = _totalUsage.messageCount + 1,
         )
+    }
+
+    private fun trackTokenSavings(contextForRequest: List<ChatMessage>) {
+        val saved = contextManager.estimateTokensSaved(_history, contextForRequest)
+        if (saved > 0) {
+            _totalUsage = _totalUsage.copy(
+                tokensSaved = _totalUsage.tokensSaved + saved,
+            )
+            Log.i(TAG, "Token savings: +$saved tokens (total saved: ${_totalUsage.tokensSaved})")
+        }
+    }
+
+    private suspend fun maybeCompressHistory() {
+        if (!contextManager.needsCompression(_history, currentConfig)) {
+            Log.d(TAG, "Compression check: not needed " +
+                "(historySize=${_history.size}, threshold=${currentConfig.recentMessageCount + currentConfig.summarizeInterval})")
+            return
+        }
+
+        val messagesToSummarize = contextManager.getMessagesToSummarize(_history, currentConfig)
+        if (messagesToSummarize.isEmpty()) {
+            Log.d(TAG, "Compression: no messages to summarize")
+            return
+        }
+
+        val tokensBefore = _history.sumOf { contextManager.estimateTokens(it.content) }
+        Log.i(TAG, "Compression triggered: historySize=${_history.size}, " +
+            "summarizing ${messagesToSummarize.size} messages, " +
+            "keeping last ${currentConfig.recentMessageCount}, " +
+            "estimated tokens before: $tokensBefore")
+
+        val summarizationMessages = contextManager.buildSummarizationRequest(
+            messagesToSummarize, _currentSummary
+        )
+        Log.d(TAG, "Sending summarization request to model '$currentModel' " +
+            "(incremental=${_currentSummary != null}, " +
+            "prevSummarizedCount=${_currentSummary?.summarizedCount ?: 0})")
+
+        val summaryResponse = repository.chat(currentModel, summarizationMessages, currentConfig)
+        val tokensAfter = contextManager.estimateTokens(summaryResponse.content)
+
+        _currentSummary = contextManager.createSummary(
+            chatId = currentChatId,
+            rootMessageId = _history.firstOrNull()?.parentId,
+            summaryContent = summaryResponse.content,
+            summarizedCount = messagesToSummarize.size,
+            previousSummary = _currentSummary,
+        )
+        historyRepository.saveSummary(_currentSummary!!)
+
+        Log.i(TAG, "Compression done: summary tokens=$tokensAfter, " +
+            "totalSummarized=${_currentSummary!!.summarizedCount} msgs, " +
+            "summary length=${summaryResponse.content.length} chars\n" +
+            "Summary preview: ${summaryResponse.content}...")
     }
 
     private fun recalculateTotalUsage() {

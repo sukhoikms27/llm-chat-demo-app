@@ -4,7 +4,18 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 
-@Database(entities = [ChatMessageEntity::class], version = 2)
+@Database(
+    entities = [
+        ChatMessageEntity::class,
+        ChatEntity::class,
+        ContextSummaryEntity::class,
+        SettingsEntity::class,
+    ],
+    version = 4,
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun chatMessageDao(): ChatMessageDao
+    abstract fun chatDao(): ChatDao
+    abstract fun contextSummaryDao(): ContextSummaryDao
+    abstract fun settingsDao(): SettingsDao
 }
