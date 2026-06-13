@@ -5,7 +5,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class StreamChunk(
     val choices: List<StreamChoice> = emptyList(),
-    val usage: Usage? = null,
 )
 
 @Serializable
@@ -18,5 +17,4 @@ data class StreamChoice(
 data class StreamDelta(
     val content: String? = null,
     val role: String? = null,
-    val reasoning_content: String? = null,
 )
