@@ -5,9 +5,12 @@ import com.example.myapplication.data.local.ChatMessageDao
 import com.example.myapplication.data.local.ChatMessageEntity
 import com.example.myapplication.data.local.ContextSummaryDao
 import com.example.myapplication.data.local.ContextSummaryEntity
+import com.example.myapplication.data.local.DialogFactsDao
+import com.example.myapplication.data.local.DialogFactsEntity
 import com.example.myapplication.domain.model.Chat
 import com.example.myapplication.domain.model.ChatMessage
 import com.example.myapplication.domain.model.ContextSummary
+import com.example.myapplication.domain.model.DialogFacts
 import com.example.myapplication.domain.model.FileAttachment
 import com.example.myapplication.domain.model.MessageRole
 import com.example.myapplication.domain.model.MessageUsage
@@ -24,6 +27,7 @@ class ChatHistoryRepositoryImpl @Inject constructor(
     private val messageDao: ChatMessageDao,
     private val chatDao: ChatDao,
     private val summaryDao: ContextSummaryDao,
+    private val factsDao: DialogFactsDao,
 ) : ChatHistoryRepository {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -47,6 +51,7 @@ class ChatHistoryRepositoryImpl @Inject constructor(
     override suspend fun clearAll() {
         messageDao.deleteAll()
         summaryDao.deleteAll()
+        factsDao.deleteForChat(1L)
     }
 
     override suspend fun saveSummary(summary: ContextSummary) {
@@ -59,6 +64,18 @@ class ChatHistoryRepositoryImpl @Inject constructor(
 
     override suspend fun clearSummary(chatId: Long) {
         summaryDao.deleteForChat(chatId)
+    }
+
+    override suspend fun saveFacts(facts: DialogFacts) {
+        factsDao.insert(facts.toEntity())
+    }
+
+    override suspend fun loadLatestFacts(chatId: Long): DialogFacts? {
+        return factsDao.getLatestForChat(chatId)?.toDomain()
+    }
+
+    override suspend fun clearFacts(chatId: Long) {
+        factsDao.deleteForChat(chatId)
     }
 
     override fun observeChats(): Flow<List<Chat>> {
@@ -83,6 +100,7 @@ class ChatHistoryRepositoryImpl @Inject constructor(
     override suspend fun deleteChat(id: Long) {
         messageDao.deleteForChat(id)
         summaryDao.deleteForChat(id)
+        factsDao.deleteForChat(id)
         chatDao.delete(id)
     }
 
@@ -155,6 +173,20 @@ class ChatHistoryRepositoryImpl @Inject constructor(
         id = id,
         title = title,
         createdAt = createdAt,
+        updatedAt = updatedAt,
+    )
+
+    private fun DialogFacts.toEntity() = DialogFactsEntity(
+        id = id,
+        chatId = chatId,
+        factsJson = factsJson,
+        updatedAt = updatedAt,
+    )
+
+    private fun DialogFactsEntity.toDomain() = DialogFacts(
+        id = id,
+        chatId = chatId,
+        factsJson = factsJson,
         updatedAt = updatedAt,
     )
 }

@@ -47,6 +47,7 @@ data class ChatUiState(
     // Context management
     val tokensSaved: Int = 0,
     val hasActiveSummary: Boolean = false,
+    val currentFacts: Map<String, String> = emptyMap(),
 )
 
 @HiltViewModel
@@ -243,6 +244,7 @@ class ChatViewModel @Inject constructor(
             estimatedCost = usage.estimatedCost,
             tokensSaved = usage.tokensSaved,
             hasActiveSummary = agent.currentSummary != null,
+            currentFacts = agent.currentFacts ?: emptyMap(),
         ) }
     }
 }

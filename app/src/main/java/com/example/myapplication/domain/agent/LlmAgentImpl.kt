@@ -3,6 +3,7 @@ package com.example.myapplication.domain.agent
 import com.example.myapplication.domain.model.AgentResponse
 import com.example.myapplication.domain.model.ChatMessage
 import com.example.myapplication.domain.model.ContextSummary
+import com.example.myapplication.domain.model.DialogFacts
 import com.example.myapplication.domain.model.FileAttachment
 import com.example.myapplication.domain.model.ContextStrategyType
 import com.example.myapplication.domain.model.GenerationConfig
@@ -41,14 +42,20 @@ class LlmAgentImpl(
     private var _currentSummary: ContextSummary? = null
     override val currentSummary: ContextSummary? get() = _currentSummary
 
+    private var _currentFacts: DialogFacts? = null
+    override val currentFacts: Map<String, String>? get() = _currentFacts?.toMap()
+
     private var currentStrategy: ContextStrategy = createStrategy(initialConfig)
     override val currentStrategyName: String get() = currentStrategy.displayName
 
-    private fun createStrategy(config: GenerationConfig): ContextStrategy =
-        when (config.contextStrategy) {
+    private fun createStrategy(config: GenerationConfig): ContextStrategy {
+        val factsMap = _currentFacts?.toMap() ?: emptyMap()
+        return when (config.contextStrategy) {
             ContextStrategyType.SLIDING_WINDOW -> SlidingWindowStrategy()
             ContextStrategyType.SUMMARIZATION -> SummaryStrategy(contextManager)
+            ContextStrategyType.STICKY_FACTS -> StickyFactsStrategy(factsMap)
         }
+    }
 
     override suspend fun initialize(chatId: Long) {
         currentChatId = chatId
@@ -58,6 +65,8 @@ class LlmAgentImpl(
             recalculateTotalUsage()
         }
         _currentSummary = historyRepository.loadLatestSummary(chatId)
+        _currentFacts = historyRepository.loadLatestFacts(chatId)
+        currentStrategy = createStrategy(currentConfig)
     }
 
     override suspend fun send(
@@ -97,6 +106,7 @@ class LlmAgentImpl(
         trackTokenSavings(contextForRequest)
 
         maybeCompressHistory()
+        maybeExtractFacts()
 
         historyRepository.touchChat(currentChatId)
         response
@@ -158,6 +168,7 @@ class LlmAgentImpl(
         trackTokenSavings(contextForRequest)
 
         maybeCompressHistory()
+        maybeExtractFacts()
 
         historyRepository.touchChat(currentChatId)
 
@@ -168,8 +179,10 @@ class LlmAgentImpl(
         _history.clear()
         _totalUsage = CumulativeUsage()
         _currentSummary = null
+        _currentFacts = null
         historyRepository.clearHistory(currentChatId)
         historyRepository.clearSummary(currentChatId)
+        historyRepository.clearFacts(currentChatId)
     }
 
     override fun setModel(modelId: String) {
@@ -244,6 +257,47 @@ class LlmAgentImpl(
             "totalSummarized=${_currentSummary!!.summarizedCount} msgs, " +
             "summary length=${summaryResponse.content.length} chars\n" +
             "Summary preview: ${summaryResponse.content}...")
+    }
+
+    /**
+     * Post-send хук для стратегии Sticky Facts.
+     * Извлекает факты из последних сообщений и обновляет _currentFacts.
+     */
+    private suspend fun maybeExtractFacts() {
+        if (currentConfig.contextStrategy != ContextStrategyType.STICKY_FACTS) return
+        if (_history.size < 2) return // Нужно хотя бы user + assistant
+
+        val currentFactsMap = _currentFacts?.toMap() ?: emptyMap()
+        val recentMessages = _history.takeLast(4) // Анализируем последние 2-3 пары
+
+        val factsRequest = StickyFactsStrategy.buildFactsExtractionRequest(
+            recentMessages, currentFactsMap
+        )
+
+        Log.d(TAG, "Facts extraction: sending request (currentFacts=${currentFactsMap.size}, " +
+            "recentMsgs=${recentMessages.size})")
+
+        try {
+            val factsResponse = repository.chat(currentModel, factsRequest, currentConfig)
+            val extractedFacts = StickyFactsStrategy.parseFactsResponse(factsResponse.content)
+
+            if (extractedFacts.isNotEmpty()) {
+                // Merge: обновленные факты заменяют старые, новые добавляются
+                val mergedFacts = currentFactsMap + extractedFacts
+                _currentFacts = DialogFacts.fromMap(currentChatId, mergedFacts)
+                historyRepository.saveFacts(_currentFacts!!)
+
+                // Пересоздаём стратегию с обновлёнными фактами
+                currentStrategy = createStrategy(currentConfig)
+
+                Log.i(TAG, "Facts extracted: ${extractedFacts.size} facts " +
+                    "(total now ${mergedFacts.size}): $extractedFacts")
+            } else {
+                Log.d(TAG, "Facts extraction: no new facts")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Facts extraction failed: ${e.message}")
+        }
     }
 
     private fun recalculateTotalUsage() {

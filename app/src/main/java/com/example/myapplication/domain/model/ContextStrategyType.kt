@@ -10,7 +10,6 @@ import kotlinx.serialization.Serializable
 enum class ContextStrategyType(val displayName: String) {
     SUMMARIZATION("Сжатие (Summary)"),
     SLIDING_WINDOW("Sliding Window"),
-    // Будут добавлены в следующих задачах:
-    // STICKY_FACTS("Sticky Facts"),
+    STICKY_FACTS("Sticky Facts"),
     // BRANCHING("Ветвление"),
 }

@@ -299,6 +299,7 @@ fun SettingsScreen(
                     text = when (config.contextStrategy) {
                         ContextStrategyType.SLIDING_WINDOW -> "В запрос отправляются только последние N сообщений, остальное отбрасывается"
                         ContextStrategyType.SUMMARIZATION -> "Автоматическое суммирование старых сообщений"
+                        ContextStrategyType.STICKY_FACTS -> "Автоизвлечение ключевых фактов + последние N сообщений"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

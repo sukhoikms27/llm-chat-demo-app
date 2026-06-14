@@ -56,3 +56,18 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         db.execSQL("ALTER TABLE chat_messages ADD COLUMN reasoningContent TEXT DEFAULT NULL")
     }
 }
+
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS dialog_facts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                chatId INTEGER NOT NULL,
+                factsJson TEXT NOT NULL,
+                updatedAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+    }
+}

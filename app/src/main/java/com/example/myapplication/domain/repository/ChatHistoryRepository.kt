@@ -3,6 +3,7 @@ package com.example.myapplication.domain.repository
 import com.example.myapplication.domain.model.Chat
 import com.example.myapplication.domain.model.ChatMessage
 import com.example.myapplication.domain.model.ContextSummary
+import com.example.myapplication.domain.model.DialogFacts
 import kotlinx.coroutines.flow.Flow
 
 interface ChatHistoryRepository {
@@ -16,6 +17,11 @@ interface ChatHistoryRepository {
     suspend fun saveSummary(summary: ContextSummary)
     suspend fun loadLatestSummary(chatId: Long): ContextSummary?
     suspend fun clearSummary(chatId: Long)
+
+    // Facts
+    suspend fun saveFacts(facts: DialogFacts)
+    suspend fun loadLatestFacts(chatId: Long): DialogFacts?
+    suspend fun clearFacts(chatId: Long)
 
     // Chats
     fun observeChats(): Flow<List<Chat>>
