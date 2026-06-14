@@ -3,6 +3,7 @@ package com.example.myapplication.domain.agent
 import com.example.myapplication.domain.model.AgentResponse
 import com.example.myapplication.domain.model.ChatMessage
 import com.example.myapplication.domain.model.ContextSummary
+import com.example.myapplication.domain.model.DialogBranch
 import com.example.myapplication.domain.model.DialogFacts
 import com.example.myapplication.domain.model.FileAttachment
 import com.example.myapplication.domain.model.ContextStrategyType
@@ -45,6 +46,12 @@ class LlmAgentImpl(
     private var _currentFacts: DialogFacts? = null
     override val currentFacts: Map<String, String>? get() = _currentFacts?.toMap()
 
+    private var _branches = mutableListOf<DialogBranch>()
+    override val branches: List<DialogBranch> get() = _branches.toList()
+
+    private var _activeBranchId: Long? = null
+    override val activeBranchId: Long? get() = _activeBranchId
+
     private var currentStrategy: ContextStrategy = createStrategy(initialConfig)
     override val currentStrategyName: String get() = currentStrategy.displayName
 
@@ -54,6 +61,7 @@ class LlmAgentImpl(
             ContextStrategyType.SLIDING_WINDOW -> SlidingWindowStrategy()
             ContextStrategyType.SUMMARIZATION -> SummaryStrategy(contextManager)
             ContextStrategyType.STICKY_FACTS -> StickyFactsStrategy(factsMap)
+            ContextStrategyType.BRANCHING -> BranchingStrategy()
         }
     }
 
@@ -66,6 +74,31 @@ class LlmAgentImpl(
         }
         _currentSummary = historyRepository.loadLatestSummary(chatId)
         _currentFacts = historyRepository.loadLatestFacts(chatId)
+
+        // Branches
+        _branches = historyRepository.getBranches(chatId).toMutableList()
+        if (_branches.isEmpty() && _history.isNotEmpty()) {
+            val leaf = _history.last().id
+            val id = historyRepository.saveBranch(
+                DialogBranch(
+                    chatId = chatId,
+                    leafMessageId = leaf,
+                    parentLeafMessageId = null,
+                    name = "main",
+                )
+            )
+            _branches.add(
+                DialogBranch(
+                    id = id,
+                    chatId = chatId,
+                    leafMessageId = leaf,
+                    parentLeafMessageId = null,
+                    name = "main",
+                )
+            )
+        }
+        _activeBranchId = _branches.firstOrNull()?.id
+
         currentStrategy = createStrategy(currentConfig)
     }
 
@@ -101,6 +134,7 @@ class LlmAgentImpl(
         )
         val assistantMsgId = historyRepository.saveMessage(assistantMsg)
         _history += assistantMsg.copy(id = assistantMsgId)
+        updateActiveBranchLeaf(assistantMsgId)
 
         response.usage?.let { accumulateUsage(it) }
         trackTokenSavings(contextForRequest)
@@ -163,6 +197,7 @@ class LlmAgentImpl(
         )
         val assistantMsgId = historyRepository.saveMessage(assistantMsg)
         _history += assistantMsg.copy(id = assistantMsgId)
+        updateActiveBranchLeaf(assistantMsgId)
 
         streamUsage?.let { accumulateUsage(it) }
         trackTokenSavings(contextForRequest)
@@ -180,9 +215,12 @@ class LlmAgentImpl(
         _totalUsage = CumulativeUsage()
         _currentSummary = null
         _currentFacts = null
+        _branches.clear()
+        _activeBranchId = null
         historyRepository.clearHistory(currentChatId)
         historyRepository.clearSummary(currentChatId)
         historyRepository.clearFacts(currentChatId)
+        historyRepository.clearBranches(currentChatId)
     }
 
     override fun setModel(modelId: String) {
@@ -297,6 +335,149 @@ class LlmAgentImpl(
             }
         } catch (e: Exception) {
             Log.w(TAG, "Facts extraction failed: ${e.message}")
+        }
+    }
+
+    // --- Branching ---
+
+    /**
+     * Обновляет leaf-сообщение активной ветки после отправки/получения.
+     */
+    private suspend fun updateActiveBranchLeaf(leafMessageId: Long) {
+        val branchId = _activeBranchId ?: return
+        historyRepository.updateBranchLeaf(branchId, leafMessageId)
+        _branches = _branches.map {
+            if (it.id == branchId) it.copy(leafMessageId = leafMessageId) else it
+        }.toMutableList()
+    }
+
+    override suspend fun createBranch(checkpointMessageId: Long): Long {
+        val checkpointIndex = _history.indexOfFirst { it.id == checkpointMessageId }
+        require(checkpointIndex >= 0) { "Checkpoint message not found in history" }
+
+        // Обрезаем историю до checkpoint
+        while (_history.size > checkpointIndex + 1) {
+            _history.removeAt(_history.size - 1)
+        }
+
+        val parentLeaf = _branches.find { it.id == _activeBranchId }?.leafMessageId
+        val parentBranchId = _activeBranchId
+
+        val tempName = ""
+        val id = historyRepository.saveBranch(
+            DialogBranch(
+                chatId = currentChatId,
+                leafMessageId = checkpointMessageId,
+                parentLeafMessageId = parentLeaf,
+                parentBranchId = parentBranchId,
+                name = tempName,
+            )
+        )
+        _branches.add(
+            DialogBranch(
+                id = id,
+                chatId = currentChatId,
+                leafMessageId = checkpointMessageId,
+                parentLeafMessageId = parentLeaf,
+                parentBranchId = parentBranchId,
+                name = tempName,
+            )
+        )
+        _activeBranchId = id
+
+        Log.i(TAG, "Branch created: id=$id, checkpoint=$checkpointMessageId, parentLeaf=$parentLeaf, parentBranch=$parentBranchId")
+
+        // Генерируем имя через LLM (не блокируем создание ветки)
+        generateBranchName(id, _history)
+
+        return id
+    }
+
+    override suspend fun switchBranch(branchId: Long) {
+        val branch = _branches.find { it.id == branchId }
+            ?: throw IllegalArgumentException("Branch $branchId not found")
+
+        _history.clear()
+        _history.addAll(
+            historyRepository.loadBranchMessages(currentChatId, branch.leafMessageId)
+        )
+        _activeBranchId = branchId
+
+        Log.i(TAG, "Switched to branch $branchId (${branch.name}), " +
+            "historySize=${_history.size}")
+    }
+
+    override suspend fun exitBranch(): Boolean {
+        val current = _branches.find { it.id == _activeBranchId } ?: return false
+        val parentId = current.parentBranchId ?: return false
+        return try {
+            switchBranch(parentId)
+            true
+        } catch (e: IllegalArgumentException) {
+            Log.w(TAG, "Parent branch $parentId not found: ${e.message}")
+            false
+        }
+    }
+
+    override suspend fun renameBranch(branchId: Long, name: String) {
+        historyRepository.renameBranch(branchId, name)
+        _branches = _branches.map {
+            if (it.id == branchId) it.copy(name = name) else it
+        }.toMutableList()
+    }
+
+    override suspend fun deleteBranch(branchId: Long) {
+        historyRepository.deleteBranch(branchId)
+        _branches.removeAll { it.id == branchId }
+        if (_activeBranchId == branchId) {
+            _activeBranchId = _branches.firstOrNull()?.id
+            // Reload history for new active branch
+            _activeBranchId?.let { switchBranch(it) }
+        }
+    }
+
+    /**
+     * Генерирует имя ветки через LLM-запрос.
+     * Берёт несколько сообщений вокруг checkpoint и просит модель придумать название.
+     */
+    private suspend fun generateBranchName(
+        branchId: Long,
+        branchHistory: List<ChatMessage>,
+    ) {
+        val recent = branchHistory.takeLast(4)
+        if (recent.isEmpty()) return
+
+        val systemMsg = ChatMessage(
+            role = MessageRole.SYSTEM,
+            content = "Ты — система генерации названий для веток диалога. " +
+                "Проанализируй сообщения и придумай короткое название (3-5 слов) " +
+                "для ветки диалога. Верни ТОЛЬКО название, без кавычек и пояснений.",
+        )
+        val userContent = buildString {
+            appendLine("Придумай название для ветки диалога:")
+            appendLine()
+            for (msg in recent) {
+                val role = when (msg.role) {
+                    MessageRole.USER -> "Пользователь"
+                    MessageRole.ASSISTANT -> "Ассистент"
+                    MessageRole.SYSTEM -> "Система"
+                }
+                appendLine("[$role]: ${msg.content.take(200)}")
+                appendLine()
+            }
+        }
+        val userMsg = ChatMessage(role = MessageRole.USER, content = userContent)
+
+        try {
+            val response = repository.chat(currentModel, listOf(systemMsg, userMsg), currentConfig)
+            val name = response.content.trim().take(50)
+            if (name.isNotEmpty()) {
+                renameBranch(branchId, name)
+                Log.i(TAG, "Branch $branchId named: '$name'")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Branch name generation failed: ${e.message}")
+            renameBranch(branchId, "Ветка $branchId")
         }
     }
 

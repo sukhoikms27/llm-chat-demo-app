@@ -11,8 +11,9 @@ import androidx.room.TypeConverter
         ContextSummaryEntity::class,
         SettingsEntity::class,
         DialogFactsEntity::class,
+        DialogBranchEntity::class,
     ],
-    version = 5,
+    version = 7,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun chatMessageDao(): ChatMessageDao
@@ -20,4 +21,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun contextSummaryDao(): ContextSummaryDao
     abstract fun settingsDao(): SettingsDao
     abstract fun dialogFactsDao(): DialogFactsDao
+    abstract fun dialogBranchDao(): DialogBranchDao
 }

@@ -11,5 +11,5 @@ enum class ContextStrategyType(val displayName: String) {
     SUMMARIZATION("Сжатие (Summary)"),
     SLIDING_WINDOW("Sliding Window"),
     STICKY_FACTS("Sticky Facts"),
-    // BRANCHING("Ветвление"),
+    BRANCHING("Ветвление"),
 }

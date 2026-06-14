@@ -71,3 +71,27 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         )
     }
 }
+
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS dialog_branches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                chatId INTEGER NOT NULL,
+                leafMessageId INTEGER NOT NULL,
+                parentLeafMessageId INTEGER,
+                name TEXT NOT NULL,
+                createdAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_dialog_branches_chatId ON dialog_branches(chatId)")
+    }
+}
+
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE dialog_branches ADD COLUMN parentBranchId INTEGER DEFAULT NULL")
+    }
+}

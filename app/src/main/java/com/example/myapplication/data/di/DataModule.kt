@@ -9,10 +9,13 @@ import com.example.myapplication.data.local.ChatDao
 import com.example.myapplication.data.local.ChatMessageDao
 import com.example.myapplication.data.local.ContextSummaryDao
 import com.example.myapplication.data.local.DialogFactsDao
+import com.example.myapplication.data.local.DialogBranchDao
 import com.example.myapplication.data.local.MIGRATION_1_2
 import com.example.myapplication.data.local.MIGRATION_2_3
 import com.example.myapplication.data.local.MIGRATION_3_4
 import com.example.myapplication.data.local.MIGRATION_4_5
+import com.example.myapplication.data.local.MIGRATION_5_6
+import com.example.myapplication.data.local.MIGRATION_6_7
 import com.example.myapplication.data.local.SettingsDao
 import com.example.myapplication.data.repository.ChatHistoryRepositoryImpl
 import com.example.myapplication.data.repository.LlmRepositoryImpl
@@ -54,7 +57,7 @@ object DataModule {
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "llm-chat-db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             .build()
 
     @Provides
@@ -73,13 +76,17 @@ object DataModule {
     fun provideDialogFactsDao(db: AppDatabase): DialogFactsDao = db.dialogFactsDao()
 
     @Provides
+    fun provideDialogBranchDao(db: AppDatabase): DialogBranchDao = db.dialogBranchDao()
+
+    @Provides
     @Singleton
     fun provideChatHistoryRepository(
         messageDao: ChatMessageDao,
         chatDao: ChatDao,
         summaryDao: ContextSummaryDao,
         factsDao: DialogFactsDao,
-    ): ChatHistoryRepository = ChatHistoryRepositoryImpl(messageDao, chatDao, summaryDao, factsDao)
+        branchDao: DialogBranchDao,
+    ): ChatHistoryRepository = ChatHistoryRepositoryImpl(messageDao, chatDao, summaryDao, factsDao, branchDao)
 
     @Provides
     @Singleton

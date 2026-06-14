@@ -29,19 +29,26 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
@@ -65,6 +72,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.example.myapplication.domain.model.ChatMessage
+import com.example.myapplication.domain.model.DialogBranch
 import com.example.myapplication.domain.model.FileAttachment
 import com.example.myapplication.domain.model.MessageRole
 import com.example.myapplication.domain.model.ModelInfo
@@ -145,6 +153,22 @@ fun ChatScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
             )
 
+            // Branch selector (only for Branching strategy)
+            if (uiState.showBranchPanel) {
+                val canExitBranch = uiState.activeBranchId != null &&
+                    uiState.activeBranchId != uiState.branches.firstOrNull()?.id
+                BranchSelector(
+                    branches = uiState.branches,
+                    activeBranchId = uiState.activeBranchId,
+                    canExitBranch = canExitBranch,
+                    onSwitch = { viewModel.switchBranch(it) },
+                    onExitBranch = { viewModel.switchBranch(uiState.branches.first().id) },
+                    onDelete = { viewModel.deleteBranch(it) },
+                    onRename = { id, name -> viewModel.renameBranch(id, name) },
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
             // Facts panel (only for Sticky Facts strategy with non-empty facts)
             if (uiState.currentFacts.isNotEmpty()) {
                 FactsPanel(facts = uiState.currentFacts)
@@ -174,7 +198,15 @@ fun ChatScreen(
                         state = listState,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(uiState.messages) { message -> MessageBubble(message = message) }
+                        items(uiState.messages) { message ->
+                            MessageBubble(
+                                message = message,
+                                showBranchButton = uiState.showBranchPanel,
+                                branchesStartingHere = uiState.branches.filter { it.parentLeafMessageId == message.id },
+                                onCreateBranch = { viewModel.createBranch(message.id) },
+                                onSwitchBranch = { viewModel.switchBranch(it) },
+                            )
+                        }
                         if (uiState.isLoading && uiState.streamingText.isNotBlank()) {
                             item { StreamingBubble(text = uiState.streamingText) }
                         } else if (uiState.isLoading) {
@@ -368,7 +400,13 @@ fun ModelSelector(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MessageBubble(message: ChatMessage) {
+fun MessageBubble(
+    message: ChatMessage,
+    showBranchButton: Boolean = false,
+    branchesStartingHere: List<DialogBranch> = emptyList(),
+    onCreateBranch: () -> Unit = {},
+    onSwitchBranch: (Long) -> Unit = {},
+) {
     val isUser = message.role == MessageRole.USER
     val context = LocalContext.current
 
@@ -409,6 +447,39 @@ fun MessageBubble(message: ChatMessage) {
                 if (estimatedTokens > 0) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(text = "~$estimatedTokens токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            // Branch button ("+" icon) — shown only in Branching strategy
+            if (showBranchButton) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (branchesStartingHere.isNotEmpty()) {
+                        branchesStartingHere.forEach { branch ->
+                            FilterChip(
+                                selected = false,
+                                onClick = { onSwitchBranch(branch.id) },
+                                label = { Text(branch.name.ifBlank { "..." }, style = MaterialTheme.typography.labelSmall) },
+                                modifier = Modifier.padding(end = 4.dp),
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    IconButton(
+                        onClick = onCreateBranch,
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Создать ветку",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
@@ -512,5 +583,105 @@ fun FactsPanel(facts: Map<String, String>) {
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BranchSelector(
+    branches: List<DialogBranch>,
+    activeBranchId: Long?,
+    canExitBranch: Boolean,
+    onSwitch: (Long) -> Unit,
+    onExitBranch: () -> Unit,
+    onDelete: (Long) -> Unit,
+    onRename: (Long, String) -> Unit,
+) {
+    var menuBranchId by remember { mutableStateOf<Long?>(null) }
+    var renamingBranchId by remember { mutableStateOf<Long?>(null) }
+    var renameText by remember { mutableStateOf("") }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (canExitBranch) {
+            IconButton(onClick = onExitBranch, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Назад к родительской ветке",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+        }
+
+        LazyRow(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            items(branches) { branch ->
+            Box {
+                FilterChip(
+                    selected = branch.id == activeBranchId,
+                    onClick = { onSwitch(branch.id) },
+                    label = { Text(branch.name.ifBlank { "..." }) },
+                    modifier = Modifier.combinedClickable(
+                        onClick = { onSwitch(branch.id) },
+                        onLongClick = { menuBranchId = branch.id },
+                    ),
+                )
+                DropdownMenu(
+                    expanded = menuBranchId == branch.id,
+                    onDismissRequest = { menuBranchId = null },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Переименовать") },
+                        onClick = {
+                            renameText = branch.name
+                            renamingBranchId = branch.id
+                            menuBranchId = null
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Удалить") },
+                        enabled = branches.size > 1,
+                        onClick = {
+                            onDelete(branch.id)
+                            menuBranchId = null
+                        },
+                    )
+                }
+            }
+        }
+        }
+    }
+
+    // Rename dialog
+    if (renamingBranchId != null) {
+        AlertDialog(
+            onDismissRequest = { renamingBranchId = null },
+            title = { Text("Переименовать ветку") },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    label = { Text("Название") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        renamingBranchId?.let { onRename(it, renameText) }
+                        renamingBranchId = null
+                    },
+                ) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { renamingBranchId = null }) { Text("Отмена") }
+            },
+        )
     }
 }

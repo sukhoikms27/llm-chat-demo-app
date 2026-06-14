@@ -3,6 +3,7 @@ package com.example.myapplication.domain.repository
 import com.example.myapplication.domain.model.Chat
 import com.example.myapplication.domain.model.ChatMessage
 import com.example.myapplication.domain.model.ContextSummary
+import com.example.myapplication.domain.model.DialogBranch
 import com.example.myapplication.domain.model.DialogFacts
 import kotlinx.coroutines.flow.Flow
 
@@ -29,4 +30,14 @@ interface ChatHistoryRepository {
     suspend fun createChat(title: String): Long
     suspend fun deleteChat(id: Long)
     suspend fun touchChat(id: Long)
+
+    // Branches
+    suspend fun saveBranch(branch: DialogBranch): Long
+    suspend fun getBranches(chatId: Long): List<DialogBranch>
+    suspend fun getBranch(id: Long): DialogBranch?
+    suspend fun renameBranch(id: Long, name: String)
+    suspend fun updateBranchLeaf(id: Long, leafMessageId: Long)
+    suspend fun deleteBranch(id: Long)
+    suspend fun clearBranches(chatId: Long)
+    suspend fun loadBranchMessages(chatId: Long, leafMessageId: Long): List<ChatMessage>
 }

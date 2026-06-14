@@ -300,6 +300,7 @@ fun SettingsScreen(
                         ContextStrategyType.SLIDING_WINDOW -> "В запрос отправляются только последние N сообщений, остальное отбрасывается"
                         ContextStrategyType.SUMMARIZATION -> "Автоматическое суммирование старых сообщений"
                         ContextStrategyType.STICKY_FACTS -> "Автоизвлечение ключевых фактов + последние N сообщений"
+                        ContextStrategyType.BRANCHING -> "Ветви диалога: checkpoint, независимые ветки, переключение"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -8,6 +8,7 @@ import com.example.myapplication.BuildConfig
 import com.example.myapplication.domain.agent.LlmAgent
 import com.example.myapplication.domain.agent.LlmAgentFactory
 import com.example.myapplication.domain.model.ChatMessage
+import com.example.myapplication.domain.model.DialogBranch
 import com.example.myapplication.domain.model.FileAttachment
 import com.example.myapplication.domain.model.GenerationConfig
 import com.example.myapplication.domain.model.GenerationPresets
@@ -48,6 +49,10 @@ data class ChatUiState(
     val tokensSaved: Int = 0,
     val hasActiveSummary: Boolean = false,
     val currentFacts: Map<String, String> = emptyMap(),
+    // Branching
+    val branches: List<DialogBranch> = emptyList(),
+    val activeBranchId: Long? = null,
+    val showBranchPanel: Boolean = false,
 )
 
 @HiltViewModel
@@ -245,6 +250,60 @@ class ChatViewModel @Inject constructor(
             tokensSaved = usage.tokensSaved,
             hasActiveSummary = agent.currentSummary != null,
             currentFacts = agent.currentFacts ?: emptyMap(),
+            branches = agent.branches,
+            activeBranchId = agent.activeBranchId,
+            showBranchPanel = agent.currentStrategyName == "Ветвление",
         ) }
+    }
+
+    // --- Branching ---
+
+    fun createBranch(checkpointMessageId: Long) {
+        viewModelScope.launch {
+            try {
+                agent.createBranch(checkpointMessageId)
+                _uiState.update { it.copy(messages = agent.conversationHistory) }
+                updateTokenStats()
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Ошибка ветки: ${e.message}") }
+            }
+        }
+    }
+
+    fun switchBranch(branchId: Long) {
+        viewModelScope.launch {
+            try {
+                agent.switchBranch(branchId)
+                _uiState.update { it.copy(messages = agent.conversationHistory) }
+                updateTokenStats()
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Ошибка переключения: ${e.message}") }
+            }
+        }
+    }
+
+    fun exitBranch() {
+        viewModelScope.launch {
+            val exited = agent.exitBranch()
+            if (exited) {
+                _uiState.update { it.copy(messages = agent.conversationHistory) }
+            }
+            updateTokenStats()
+        }
+    }
+
+    fun renameBranch(branchId: Long, name: String) {
+        viewModelScope.launch {
+            agent.renameBranch(branchId, name)
+            updateTokenStats()
+        }
+    }
+
+    fun deleteBranch(branchId: Long) {
+        viewModelScope.launch {
+            agent.deleteBranch(branchId)
+            _uiState.update { it.copy(messages = agent.conversationHistory) }
+            updateTokenStats()
+        }
     }
 }

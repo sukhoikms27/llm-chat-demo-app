@@ -7,9 +7,12 @@ import com.example.myapplication.data.local.ContextSummaryDao
 import com.example.myapplication.data.local.ContextSummaryEntity
 import com.example.myapplication.data.local.DialogFactsDao
 import com.example.myapplication.data.local.DialogFactsEntity
+import com.example.myapplication.data.local.DialogBranchDao
+import com.example.myapplication.data.local.DialogBranchEntity
 import com.example.myapplication.domain.model.Chat
 import com.example.myapplication.domain.model.ChatMessage
 import com.example.myapplication.domain.model.ContextSummary
+import com.example.myapplication.domain.model.DialogBranch
 import com.example.myapplication.domain.model.DialogFacts
 import com.example.myapplication.domain.model.FileAttachment
 import com.example.myapplication.domain.model.MessageRole
@@ -28,6 +31,7 @@ class ChatHistoryRepositoryImpl @Inject constructor(
     private val chatDao: ChatDao,
     private val summaryDao: ContextSummaryDao,
     private val factsDao: DialogFactsDao,
+    private val branchDao: DialogBranchDao,
 ) : ChatHistoryRepository {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -52,6 +56,7 @@ class ChatHistoryRepositoryImpl @Inject constructor(
         messageDao.deleteAll()
         summaryDao.deleteAll()
         factsDao.deleteForChat(1L)
+        branchDao.deleteAll()
     }
 
     override suspend fun saveSummary(summary: ContextSummary) {
@@ -101,7 +106,48 @@ class ChatHistoryRepositoryImpl @Inject constructor(
         messageDao.deleteForChat(id)
         summaryDao.deleteForChat(id)
         factsDao.deleteForChat(id)
+        branchDao.deleteForChat(id)
         chatDao.delete(id)
+    }
+
+    override suspend fun saveBranch(branch: DialogBranch): Long {
+        return branchDao.insert(branch.toEntity())
+    }
+
+    override suspend fun getBranches(chatId: Long): List<DialogBranch> {
+        return branchDao.getForChat(chatId).map { it.toDomain() }
+    }
+
+    override suspend fun getBranch(id: Long): DialogBranch? {
+        return branchDao.getById(id)?.toDomain()
+    }
+
+    override suspend fun renameBranch(id: Long, name: String) {
+        branchDao.rename(id, name)
+    }
+
+    override suspend fun updateBranchLeaf(id: Long, leafMessageId: Long) {
+        branchDao.updateLeaf(id, leafMessageId)
+    }
+
+    override suspend fun deleteBranch(id: Long) {
+        branchDao.delete(id)
+    }
+
+    override suspend fun clearBranches(chatId: Long) {
+        branchDao.deleteForChat(chatId)
+    }
+
+    override suspend fun loadBranchMessages(chatId: Long, leafMessageId: Long): List<ChatMessage> {
+        val all = messageDao.getForChat(chatId).map { it.toDomain() }
+        val path = mutableListOf<ChatMessage>()
+        var current = all.find { it.id == leafMessageId }
+        while (current != null) {
+            path.add(0, current)
+            val parentId = current.parentId ?: break
+            current = all.find { it.id == parentId }
+        }
+        return path
     }
 
     override suspend fun touchChat(id: Long) {
@@ -188,5 +234,25 @@ class ChatHistoryRepositoryImpl @Inject constructor(
         chatId = chatId,
         factsJson = factsJson,
         updatedAt = updatedAt,
+    )
+
+    private fun DialogBranch.toEntity() = DialogBranchEntity(
+        id = id,
+        chatId = chatId,
+        leafMessageId = leafMessageId,
+        parentLeafMessageId = parentLeafMessageId,
+        parentBranchId = parentBranchId,
+        name = name,
+        createdAt = createdAt,
+    )
+
+    private fun DialogBranchEntity.toDomain() = DialogBranch(
+        id = id,
+        chatId = chatId,
+        leafMessageId = leafMessageId,
+        parentLeafMessageId = parentLeafMessageId,
+        parentBranchId = parentBranchId,
+        name = name,
+        createdAt = createdAt,
     )
 }
